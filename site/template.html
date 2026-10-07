@@ -1,0 +1,239 @@
+<title>Bangers Xchange Club</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Schibsted+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: record-shop crate — sticker-tab mood dividers up top, a mood map, then the crate of tracks */
+:root{
+  --bg:#F1F0F6; --card:#FFFFFF; --ink:#17142A; --muted:#625E7C; --line:#DCDAE6;
+  --hot:#D81F57; --hot-ink:#FFFFFF; --sun:#F4B400; --dot:#B9B5CC;
+  --display:"Dela Gothic One","Arial Black",Impact,sans-serif;
+  --body:"Schibsted Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#14121F; --card:#1E1B2E; --ink:#F1EFF8; --muted:#A39EBC; --line:#312C48;
+  --hot:#FF4F82; --hot-ink:#14121F; --sun:#FFC83D; --dot:#4A4566; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14121F; --card:#1E1B2E; --ink:#F1EFF8; --muted:#A39EBC; --line:#312C48;
+  --hot:#FF4F82; --hot-ink:#14121F; --sun:#FFC83D; --dot:#4A4566; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body);margin:0}
+.wrap{max-width:860px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:flex;flex-direction:column;gap:22px}
+header{display:flex;flex-direction:column;gap:6px}
+.brand{font:400 clamp(30px,8vw,52px)/0.95 var(--display);letter-spacing:-.01em;margin:0;text-wrap:balance}
+.brand span{color:var(--hot)}
+.sub{color:var(--muted);margin:0;max-width:60ch}
+.sub b{color:var(--ink);font-weight:700}
+.label{font:500 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+.moods{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.mood{all:unset;cursor:pointer;background:var(--card);border:1.5px solid var(--line);border-radius:6px 18px 6px 6px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;transition:transform .12s,border-color .12s}
+.mood:hover{transform:translateY(-2px);border-color:var(--ink)}
+.mood:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.mood .n{font:400 17px/1.1 var(--display)}
+.mood .d{font-size:13px;color:var(--muted)}
+.mood .c{font:500 11px/1 var(--mono);color:var(--muted)}
+.mood[aria-pressed="true"]{background:var(--hot);border-color:var(--hot);color:var(--hot-ink);transform:rotate(-1.2deg)}
+.mood[aria-pressed="true"] .d,.mood[aria-pressed="true"] .c{color:var(--hot-ink);opacity:.85}
+.panel{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:20px;align-items:start}
+@media (max-width:640px){.panel{grid-template-columns:minmax(0,1fr)}.map{order:-1}}
+.refine{display:flex;flex-direction:column;gap:14px;min-width:0}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{all:unset;cursor:pointer;font-size:13px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip:focus-visible{outline:2px solid var(--sun);outline-offset:2px}
+.search{width:100%;font:inherit;padding:10px 12px;border-radius:8px;border:1.5px solid var(--line);background:var(--card);color:var(--ink)}
+.search:focus{outline:none;border-color:var(--ink)}
+.map{background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:10px}
+.map svg{display:block;width:100%;height:auto}
+.map p{margin:6px 0 0;font-size:12px;color:var(--muted)}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;border-top:2px solid var(--ink);padding-top:14px}
+.count{font:400 20px/1.1 var(--display)}
+.count small{font:500 13px var(--body);color:var(--muted);display:block;margin-top:4px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{all:unset;cursor:pointer;font-weight:700;font-size:14px;padding:10px 14px;border-radius:8px;border:1.5px solid var(--ink);color:var(--ink)}
+.btn.primary{background:var(--ink);color:var(--bg)}
+.btn:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.trk{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:12px 2px;border-bottom:1px solid var(--line);align-items:center}
+.trk .t{font-weight:700;min-width:0;overflow-wrap:anywhere}
+.trk .a{color:var(--muted);font-size:14px;min-width:0;overflow-wrap:anywhere}
+.meta{grid-column:1/2;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;font:500 11px/1 var(--mono);color:var(--muted)}
+.tag{border:1px solid var(--line);border-radius:4px;padding:3px 6px}
+.meter{display:inline-flex;gap:2px;align-items:flex-end;height:12px}
+.meter i{width:4px;background:var(--line);border-radius:1px}
+.meter i.on{background:var(--hot)}
+.guess{color:var(--sun);font-weight:700}
+.play{grid-column:2;grid-row:1/4;all:unset;cursor:pointer;width:44px;height:44px;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center;justify-self:end}
+.play:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.play svg{width:16px;height:16px;fill:currentColor;margin-left:2px}
+.empty{padding:28px 0;color:var(--muted)}
+.more{align-self:center}
+footer{color:var(--muted);font-size:13px;display:flex;flex-direction:column;gap:6px;max-width:65ch}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:700;font-size:14px;z-index:5}
+textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}.mood[aria-pressed="true"]{transform:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1 class="brand">Bangers<br>Xchange <span>Club</span></h1>
+    <p class="sub">Pick a mood and dip into the club's playlist. <b id="total"></b> tracks, tagged by hand for energy, mood and genre. Tap ▶ to open a track in Spotify.</p>
+  </header>
+
+  <section aria-labelledby="moodLabel">
+    <p class="label" id="moodLabel">What's the mood?</p>
+    <div class="moods" id="moods"></div>
+  </section>
+
+  <section class="panel">
+    <div class="refine">
+      <div>
+        <p class="label">Energy</p>
+        <div class="chips" id="energy"></div>
+      </div>
+      <div>
+        <p class="label">Genre</p>
+        <div class="chips" id="genres"></div>
+      </div>
+      <div>
+        <p class="label">Era</p>
+        <div class="chips" id="decades"></div>
+      </div>
+      <div>
+        <label class="label" for="q">Search artist or title</label>
+        <input class="search" id="q" type="search" placeholder="e.g. Kate Bush, dub, Marvin" autocomplete="off">
+      </div>
+    </div>
+    <div class="map" aria-hidden="true">
+      <svg id="map" viewBox="0 0 200 170"></svg>
+      <p>Every track plotted by energy and brightness. Your current picks light up.</p>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <div class="bar">
+      <div class="count" id="count"></div>
+      <div class="btns">
+        <button class="btn primary" id="shuffle" type="button">Shuffle 12</button>
+        <button class="btn" id="showall" type="button">Show all</button>
+        <button class="btn" id="copy" type="button">Copy as playlist</button>
+      </div>
+    </div>
+    <div id="fallbackBox" hidden>
+      <p class="label">Select all and copy these links</p>
+      <textarea class="fallback" id="fallback" readonly></textarea>
+    </div>
+    <ul class="list" id="list"></ul>
+    <button class="btn more" id="more" type="button" hidden>Show 12 more</button>
+  </section>
+
+  <footer>
+    <p><b>Copy as playlist:</b> copies the Spotify links for the tracks on screen. In the Spotify desktop app, open an empty playlist and paste, and they all drop in.</p>
+    <p>Energy, mood and genre tags are hand-made judgement calls, not Spotify data. Tracks marked <span class="guess">~</span> were harder to place, so take those tags loosely.</p>
+    <p id="updated"></p>
+  </footer>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const TRACKS = __DATA__;
+const UPDATED = "__UPDATED__";
+const G = {so:"Soul & Funk",dh:"Disco & House",el:"Electronic",hh:"Hip-Hop",rg:"Reggae & Ska",rk:"Rock",pk:"Punk & Post-Punk",in:"Indie & Alt",ps:"Psych & Kraut",fo:"Folk & Songwriter",jz:"Jazz",bl:"Blues",af:"African",la:"Latin & Brazil",jp:"Japan",me:"Arabic & South Asian",eu:"Euro Pop & Chanson",sp:"Synth-pop & 80s",am:"Ambient & Calm"};
+const r=(x,a,b)=>x>=a&&x<=b, has=(t,gs)=>t.g.some(g=>gs.includes(g));
+const MOODS=[
+ {k:"easy",n:"Easy listening",d:"Gentle, warm, unhurried",f:t=>r(t.e,1,2)&&t.v>=3&&t.d<=3},
+ {k:"party",n:"Dance party",d:"Floor-fillers, high energy",f:t=>t.e>=4&&t.d>=4&&t.v>=3},
+ {k:"late",n:"Late night",d:"Moody, low-lit, grooving",f:t=>r(t.e,2,3)&&t.v<=3&&t.d>=2&&has(t,["el","so","hh","jz","dh","rg","sp"])},
+ {k:"sunday",n:"Sunday morning",d:"Bright, acoustic, slow coffee",f:t=>t.e<=3&&t.v>=3&&t.ac>=4},
+ {k:"focus",n:"Focus",d:"Instrumental, no words",f:t=>t.i===1&&t.e<=4},
+ {k:"cook",n:"Cooking",d:"Upbeat, sunny, a bit of swing",f:t=>r(t.e,3,4)&&t.v>=4&&r(t.d,3,4)},
+ {k:"road",n:"Road trip",d:"Windows down, sing along",f:t=>t.e>=4&&t.v>=3&&has(t,["rk","in","so","fo","pk","sp"])},
+ {k:"rainy",n:"Rainy day",d:"Melancholy and reflective",f:t=>t.v<=2&&t.e<=3},
+ {k:"loud",n:"Turn it up",d:"Loud guitars and raw edges",f:t=>t.e===5&&has(t,["rk","pk","in","hh"])},
+ {k:"new",n:"Just added",d:"The 20 newest picks",f:t=>t.n>=TRACKS.length-20},
+ {k:"all",n:"Everything",d:"The whole crate",f:()=>true},
+];
+const ENERGY=[[1,"Still"],[2,"Low"],[3,"Medium"],[4,"High"],[5,"Flat out"]];
+const decade=y=>!y?"":y<1960?"Pre-60s":(Math.floor(y/10)*10)+"s";
+const DECS=["Pre-60s","1960s","1970s","1980s","1990s","2000s","2010s","2020s"];
+TRACKS.forEach((t,i)=>{t.n=i;t.dec=decade(t.y);t.q=(t.t+" "+t.a).toLowerCase()});
+
+const S={mood:"easy",energy:new Set(),genres:new Set(),decades:new Set(),q:"",shown:[],pool:[],mode:"sample",limit:12};
+try{const m=localStorage.getItem("bxc-mood");if(m&&MOODS.some(x=>x.k===m))S.mood=m}catch(e){}
+const $=id=>document.getElementById(id);
+$("total").textContent=TRACKS.length;
+$("updated").textContent=UPDATED?"Playlist last checked: "+UPDATED+". It refreshes automatically every two days.":"";
+
+function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function chip(el,label,on,fn){const b=document.createElement("button");b.type="button";b.className="chip";b.textContent=label;b.setAttribute("aria-pressed",on);b.onclick=fn;el.appendChild(b);return b}
+
+function renderMoods(){
+  const el=$("moods");el.innerHTML="";
+  MOODS.forEach(m=>{
+    const c=TRACKS.filter(m.f).length;
+    const b=document.createElement("button");b.type="button";b.className="mood";
+    b.setAttribute("aria-pressed",S.mood===m.k);
+    b.innerHTML=`<span class="n">${m.n}</span><span class="d">${m.d}</span><span class="c">${c} tracks</span>`;
+    b.onclick=()=>{S.mood=m.k;try{localStorage.setItem("bxc-mood",m.k)}catch(e){};S.mode="sample";renderMoods();renderFilters();update(true)};
+    el.appendChild(b);
+  });
+}
+function toggle(set,v){set.has(v)?set.delete(v):set.add(v);S.mode="sample";renderFilters();update(true)}
+function renderFilters(){
+  const e=$("energy");e.innerHTML="";ENERGY.forEach(([v,l])=>chip(e,l,S.energy.has(v),()=>toggle(S.energy,v)));
+  const g=$("genres");g.innerHTML="";
+  const base=TRACKS.filter(MOODS.find(m=>m.k===S.mood).f);
+  Object.entries(G).map(([k,l])=>[k,l,base.filter(t=>t.g.includes(k)).length]).filter(x=>x[2]>0||S.genres.has(x[0])).sort((a,b)=>b[2]-a[2])
+    .forEach(([k,l,c])=>chip(g,`${l} · ${c}`,S.genres.has(k),()=>toggle(S.genres,k)));
+  const d=$("decades");d.innerHTML="";DECS.forEach(x=>chip(d,x,S.decades.has(x),()=>toggle(S.decades,x)));
+}
+function filtered(){
+  const m=MOODS.find(x=>x.k===S.mood);
+  return TRACKS.filter(t=>m.f(t)&&(!S.energy.size||S.energy.has(t.e))&&(!S.genres.size||t.g.some(g=>S.genres.has(g)))&&(!S.decades.size||S.decades.has(t.dec))&&(!S.q||t.q.includes(S.q)));
+}
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+function update(reshuffle){
+  const f=filtered();
+  if(reshuffle||S.pool.length!==f.length)S.pool=S.mode==="all"?f.slice().sort((a,b)=>a.a.localeCompare(b.a)):shuffle(f);
+  if(S.mode==="all")S.pool=f.slice().sort((a,b)=>a.a.localeCompare(b.a));
+  S.shown=S.pool.slice(0,S.limit);
+  const m=MOODS.find(x=>x.k===S.mood);
+  $("count").innerHTML=`${f.length} ${f.length===1?"track fits":"tracks fit"}<small>${m.n}${S.mode==="all"?" · A–Z by artist":" · showing a random "+S.shown.length}</small>`;
+  $("shuffle").textContent=S.mode==="all"?"Shuffle 12":"Shuffle again";
+  const ul=$("list");
+  if(!f.length){ul.innerHTML=`<li class="empty">Nothing fits all of those picks. Try clearing a genre or era.</li>`}
+  else ul.innerHTML=S.shown.map(t=>`<li class="trk">
+    <span class="t">${esc(t.t)}</span>
+    <span class="a">${esc(t.a)}${t.y?" · "+t.y:""}</span>
+    <span class="meta">${t.pending?"":`<span class="meter" title="Energy ${t.e} of 5">${[1,2,3,4,5].map(i=>`<i class="${i<=t.e?"on":""}" style="height:${3+i*2}px"></i>`).join("")}</span>`}${t.g.map(g=>`<span class="tag">${G[g]}</span>`).join("")}${t.pending?'<span class="tag">New · tags coming</span>':t.lc?'<span class="guess" title="Harder to place, tags are a best guess">~</span>':""}</span>
+    <a class="play" href="https://open.spotify.com/track/${t.id}" target="_blank" rel="noopener" aria-label="Open ${esc(t.t)} in Spotify"><svg viewBox="0 0 16 16"><path d="M3 1.5v13l11-6.5z"/></svg></a>
+  </li>`).join("");
+  $("more").hidden=S.shown.length>=S.pool.length;
+  $("fallbackBox").hidden=true;
+  drawMap(f);
+}
+function drawMap(f){
+  const on=new Set(f.map(t=>t.n));
+  const W=200,H=170,px=t=>18+(t.v-1)/4*172+((t.n*37)%13-6),py=t=>150-(t.e-1)/4*136+((t.n*53)%11-5);
+  let s=`<line x1="14" y1="156" x2="196" y2="156" stroke="var(--line)"/><line x1="14" y1="6" x2="14" y2="156" stroke="var(--line)"/>
+  <text x="196" y="167" text-anchor="end" font-size="8" font-family="var(--mono)" fill="var(--muted)">brighter →</text>
+  <text x="17" y="167" font-size="8" font-family="var(--mono)" fill="var(--muted)">darker</text>
+  <text x="10" y="12" font-size="8" font-family="var(--mono)" fill="var(--muted)" transform="rotate(-90 10 12)" text-anchor="end">energy →</text>`;
+  TRACKS.forEach(t=>{if(!t.pending&&!on.has(t.n))s+=`<circle cx="${px(t).toFixed(1)}" cy="${py(t).toFixed(1)}" r="1.6" fill="var(--dot)"/>`});
+  TRACKS.forEach(t=>{if(!t.pending&&on.has(t.n))s+=`<circle cx="${px(t).toFixed(1)}" cy="${py(t).toFixed(1)}" r="2.4" fill="var(--hot)"/>`});
+  $("map").innerHTML=s;
+}
+let toastT;function toast(m){const t=$("toast");t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2200)}
+$("shuffle").onclick=()=>{S.mode="sample";S.limit=12;update(true)};
+$("showall").onclick=()=>{S.mode="all";S.limit=100000;update(true)};
+$("more").onclick=()=>{S.limit+=12;update(false)};
+let qt;$("q").oninput=e=>{clearTimeout(qt);qt=setTimeout(()=>{S.q=e.target.value.trim().toLowerCase();update(true)},150)};
+$("copy").onclick=()=>{
+  const txt=S.shown.map(t=>"https://open.spotify.com/track/"+t.id).join("\n");
+  if(!S.shown.length){toast("No tracks to copy");return}
+  const fb=()=>{$("fallback").value=txt;$("fallbackBox").hidden=false;$("fallback").focus();$("fallback").select()};
+  try{navigator.clipboard.writeText(txt).then(()=>toast(`Copied ${S.shown.length} links`),fb)}catch(e){fb()}
+};
+renderMoods();renderFilters();update(true);
+</script>
