@@ -64,6 +64,8 @@ jobs:
         run: python scripts/tag.py
 
       - name: Build page
+        env:
+          SPOTIFY_CLIENT_ID: ${{ vars.SPOTIFY_CLIENT_ID }}
         run: python scripts/build.py
 
       - name: Save data

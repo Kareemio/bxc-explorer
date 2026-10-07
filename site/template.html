@@ -163,7 +163,7 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
     <summary>🔍 Find songs missing from the playlist</summary>
     <p class="hint">For whoever keeps the playlist: check a WhatsApp chat export for shared songs that haven't been added yet.</p>
     <div class="catch-body">
-      <p class="sub">In WhatsApp, open the group, then <b>Export chat → Without media</b>. Drop the file (.txt or .zip) here. It's read on this device only and never uploaded.</p>
+      <p class="sub">In WhatsApp, open the group, then <b>Export chat → Without media</b>. On a phone, save the export to Files, then tap the box below and pick it. The chat is read on this device only and never uploaded.</p>
       <label class="drop" id="drop" for="chatfile">Drop the chat export here, or tap to choose it<input type="file" id="chatfile" accept=".txt,.zip,text/plain,application/zip"></label>
       <div id="catchOut"></div>
     </div>
@@ -362,7 +362,7 @@ async function runCatch(f){
   const missing=[...found].filter(([id])=>!INPL.has(id)).map(([id,v])=>({id,date:v.date}));
   const total=found.size;
   let h=`<div class="bar" style="border-top:none;padding-top:0"><div class="count">${missing.length} missing<small>${total} Spotify songs shared in this export · ${total-missing.length} already in the playlist</small></div>`;
-  if(missing.length)h+=`<div class="btns"><button class="btn primary" id="copyMissing" type="button">Copy all missing links</button></div>`;
+  if(missing.length)h+=`<div class="btns">${SPOTIFY_CLIENT_ID?`<button class="btn primary" id="addMissing" type="button">Add all ${missing.length} to the playlist</button>`:""}<button class="btn${SPOTIFY_CLIENT_ID?"":" primary"}" id="copyMissing" type="button">Copy all missing links</button></div><p class="sub" id="addStatus" hidden></p>`;
   h+=`</div>`;
   if(missing.length){
     h+=`<p class="sub">Paste them into the playlist in the Spotify desktop app: open the playlist, click the track list, and paste. A song can show as missing if the playlist already has a different release of it.</p><ul class="mlist" id="mlist">`+missing.map(m=>`<li data-id="${m.id}"><span class="mt">Loading title…</span><span class="md">Shared ${esc(m.date||"")}</span><a href="https://open.spotify.com/track/${m.id}" target="_blank" rel="noopener">Spotify ↗</a></li>`).join("")+`</ul>`;
@@ -373,11 +373,69 @@ async function runCatch(f){
   if(!total&&!short.size&&!other.size)h=`<p class="sub">No music links found in that file. Check it's the group's chat export.</p>`;
   out.innerHTML=h;
   if(missing.length){
+    if(SPOTIFY_CLIENT_ID)$("addMissing").onclick=()=>addToPlaylist(missing.map(m=>m.id));
     $("copyMissing").onclick=()=>{const txt=missing.map(m=>"https://open.spotify.com/track/"+m.id).join("\n");
       try{navigator.clipboard.writeText(txt).then(()=>toast(`Copied ${missing.length} links`),()=>{$("fallback").value=txt;$("fallbackBox").hidden=false;$("fallback").select()})}catch(e){}};
     for(const m of missing){const li=out.querySelector(`li[data-id="${m.id}"] .mt`);title(m.id).then(t=>{if(li)li.textContent=t||"Title unavailable, open in Spotify to check"})}
   }
 }
+// ---- Add straight to the playlist (Spotify sign-in, PKCE, no secret in the page) ----
+const SPOTIFY_CLIENT_ID="__SPOTIFY_CLIENT_ID__".startsWith("__")?"":"__SPOTIFY_CLIENT_ID__";
+const PLAYLIST_ID="__PLAYLIST_ID__";
+const REDIRECT=location.origin+location.pathname;
+const ss={get:k=>{try{return sessionStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{sessionStorage.setItem(k,v)}catch(e){}},del:k=>{try{sessionStorage.removeItem(k)}catch(e){}}};
+const b64u=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+function status(msg){const el=$("addStatus");if(el){el.hidden=false;el.textContent=msg}else toast(msg)}
+async function signIn(){
+  const verifier=b64u(crypto.getRandomValues(new Uint8Array(48)));
+  const challenge=b64u(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(verifier)));
+  ss.set("sp_verifier",verifier);
+  const q=new URLSearchParams({client_id:SPOTIFY_CLIENT_ID,response_type:"code",redirect_uri:REDIRECT,code_challenge_method:"S256",code_challenge:challenge,scope:"playlist-modify-public playlist-modify-private"});
+  location.href="https://accounts.spotify.com/authorize?"+q;
+}
+async function addToPlaylist(ids){
+  const tok=ss.get("sp_token"),exp=+ss.get("sp_exp")||0;
+  if(!tok||Date.now()>exp){ss.set("sp_pending",JSON.stringify(ids));status("Opening Spotify sign-in…");return signIn()}
+  status(`Adding ${ids.length} songs…`);
+  let added=0;
+  for(let i=0;i<ids.length;i+=100){
+    const uris=ids.slice(i,i+100).map(id=>"spotify:track:"+id);
+    let r;
+    for(const path of ["items","tracks"]){
+      r=await fetch(`https://api.spotify.com/v1/playlists/${PLAYLIST_ID}/${path}`,{method:"POST",headers:{Authorization:"Bearer "+tok,"Content-Type":"application/json"},body:JSON.stringify({uris})});
+      if(r.status!==404)break;
+    }
+    if(!r.ok){
+      let detail="";try{detail=(await r.json()).error.message}catch(e){}
+      const why=r.status===401?"The Spotify sign-in expired. Tap the button again.":
+        r.status===403?"Spotify refused. This only works for the playlist's owner or a collaborator who's on the app's user list.":
+        `Spotify returned an error (${r.status}).`;
+      if(r.status===401){ss.del("sp_token")}
+      status(`${added?`Added ${added}, then stopped. `:""}${why}${detail?" ("+detail+")":""} You can still use Copy all missing links.`);return;
+    }
+    added+=uris.length;
+  }
+  ids.forEach(id=>INPL.add(id));
+  status(`Added ${added} songs to the playlist. They'll show up in the explorer after tomorrow morning's refresh.`);
+  toast(`Added ${added} songs`);
+}
+async function finishSignIn(){
+  const q=new URLSearchParams(location.search);const code=q.get("code"),err=q.get("error");
+  if(!code&&!err)return;
+  history.replaceState(null,"",REDIRECT+"#missing");$("catch").open=true;
+  const pending=JSON.parse(ss.get("sp_pending")||"[]");ss.del("sp_pending");
+  const out=$("catchOut");
+  if(err){out.innerHTML=`<p class="sub">Spotify sign-in was cancelled.</p>`;return}
+  try{
+    const r=await fetch("https://accounts.spotify.com/api/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
+      body:new URLSearchParams({client_id:SPOTIFY_CLIENT_ID,grant_type:"authorization_code",code,redirect_uri:REDIRECT,code_verifier:ss.get("sp_verifier")||""})});
+    const j=await r.json();ss.del("sp_verifier");
+    if(!r.ok)throw new Error(j.error_description||j.error||r.status);
+    ss.set("sp_token",j.access_token);ss.set("sp_exp",String(Date.now()+(j.expires_in-60)*1000));
+  }catch(e){out.innerHTML=`<p class="sub">Spotify sign-in failed (${esc(String(e.message||e))}). If this keeps happening, the account may not be on the Spotify app's user list.</p>`;return}
+  if(pending.length){out.innerHTML=`<p class="sub" id="addStatus"></p>`;await addToPlaylist(pending)}
+}
+if(SPOTIFY_CLIENT_ID)finishSignIn();
 $("chatfile").onchange=e=>{const f=e.target.files[0];if(f)runCatch(f)};
 const dz=$("drop");["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("over")}));
 ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("over")}));
