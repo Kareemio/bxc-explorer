@@ -83,9 +83,13 @@ footer{color:var(--muted);font-size:13px;display:flex;flex-direction:column;gap:
 #embed iframe{display:block;border-radius:12px}
 body.docked .wrap{padding-bottom:200px}
 .catch{border-top:2px solid var(--ink);padding-top:14px}
-.catch summary{cursor:pointer;font:400 18px/1.2 var(--display);list-style:none}
+.catch summary{cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:10px;font-weight:700;font-size:14px;padding:10px 14px;border-radius:8px;border:1.5px solid var(--ink);color:var(--ink);background:var(--card)}
 .catch summary::-webkit-details-marker{display:none}
-.catch summary span{font:500 13px var(--body);color:var(--muted);display:block;margin-top:4px}
+.catch summary::after{content:"▾";transition:transform .15s}
+.catch[open] summary{background:var(--ink);color:var(--bg)}
+.catch[open] summary::after{transform:rotate(180deg)}
+.catch summary:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.catch .hint{font-size:13px;color:var(--muted);margin:8px 0 0}
 .catch-body{display:flex;flex-direction:column;gap:12px;margin-top:14px}
 .drop{border:2px dashed var(--line);border-radius:10px;padding:18px;text-align:center;color:var(--muted);cursor:pointer}
 .drop.over{border-color:var(--hot);color:var(--ink)}
@@ -156,7 +160,8 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
   </section>
 
   <details class="catch" id="catch">
-    <summary>Missing from the playlist?<span>For whoever keeps the playlist: drop in a WhatsApp chat export and see which shared songs haven't been added yet.</span></summary>
+    <summary>🔍 Find songs missing from the playlist</summary>
+    <p class="hint">For whoever keeps the playlist: check a WhatsApp chat export for shared songs that haven't been added yet.</p>
     <div class="catch-body">
       <p class="sub">In WhatsApp, open the group, then <b>Export chat → Without media</b>. Drop the file (.txt or .zip) here. It's read on this device only and never uploaded.</p>
       <label class="drop" id="drop" for="chatfile">Drop the chat export here, or tap to choose it<input type="file" id="chatfile" accept=".txt,.zip,text/plain,application/zip"></label>
