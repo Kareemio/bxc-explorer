@@ -9,7 +9,7 @@ A mood-based browser for the club's Spotify playlist. Every other day GitHub rea
 | Read | `scripts/scrape.py` | Opens the public playlist page in a headless browser and scrolls through it. Stops without changing anything if it reads fewer than 97% of the rows. |
 | Tag | `scripts/tag.py` | Sends only new songs to GitHub Models (free with the workflow's own token). Existing tags are used as examples so new ones match. If tagging fails, new songs still appear under "Everything" and "Just added", and the next run tries again. |
 | Build | `scripts/build.py` | Fills `site/template.html` with the tracks and writes `_site/index.html`. |
-| Publish | `.github/workflows/refresh.yml` | Runs the three steps every other day at 10:17 UTC, saves the data back to the repo, and deploys to GitHub Pages. |
+| Publish | `.github/workflows/refresh.yml` | Runs the three steps daily at 4:07am UK time, saves the data back to the repo, and deploys to GitHub Pages. |
 
 `data/tracks.json` is the tag library (every song ever tagged). `data/playlist.json` is the playlist as last read.
 

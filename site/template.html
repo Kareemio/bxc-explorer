@@ -82,6 +82,20 @@ footer{color:var(--muted);font-size:13px;display:flex;flex-direction:column;gap:
 .dock-ctl button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 #embed iframe{display:block;border-radius:12px}
 body.docked .wrap{padding-bottom:200px}
+.catch{border-top:2px solid var(--ink);padding-top:14px}
+.catch summary{cursor:pointer;font:400 18px/1.2 var(--display);list-style:none}
+.catch summary::-webkit-details-marker{display:none}
+.catch summary span{font:500 13px var(--body);color:var(--muted);display:block;margin-top:4px}
+.catch-body{display:flex;flex-direction:column;gap:12px;margin-top:14px}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:18px;text-align:center;color:var(--muted);cursor:pointer}
+.drop.over{border-color:var(--hot);color:var(--ink)}
+.drop input{display:none}
+.mlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.mlist li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}
+.mlist .mt{font-weight:700;overflow-wrap:anywhere}
+.mlist .md{font:500 11px/1.3 var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.mlist a{grid-row:1/3;grid-column:2;align-self:center;font:500 11px var(--mono);color:var(--muted)}
+.mhead{font:500 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:8px 0 0}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:700;font-size:14px;z-index:5}
 textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}.mood[aria-pressed="true"]{transform:none}}
@@ -141,6 +155,15 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
     <button class="btn more" id="more" type="button" hidden>Show 12 more</button>
   </section>
 
+  <details class="catch" id="catch">
+    <summary>Missing from the playlist?<span>For whoever keeps the playlist: drop in a WhatsApp chat export and see which shared songs haven't been added yet.</span></summary>
+    <div class="catch-body">
+      <p class="sub">In WhatsApp, open the group, then <b>Export chat → Without media</b>. Drop the file (.txt or .zip) here. It's read on this device only and never uploaded.</p>
+      <label class="drop" id="drop" for="chatfile">Drop the chat export here, or tap to choose it<input type="file" id="chatfile" accept=".txt,.zip,text/plain,application/zip"></label>
+      <div id="catchOut"></div>
+    </div>
+  </details>
+
   <footer>
     <p><b>Playing:</b> songs play in the player at the bottom of the page and move on by themselves. Sign in at open.spotify.com in the same browser to hear full songs; otherwise Spotify plays 30-second previews. On phones, the browser sometimes needs a tap on the player to start the next song.</p>
     <p><b>Copy as playlist:</b> copies the Spotify links for the tracks on screen. In the Spotify desktop app, open an empty playlist and paste, and they all drop in.</p>
@@ -191,7 +214,7 @@ const S={mood:"easy",energy:new Set(),genres:new Set(),decades:new Set(),q:"",sh
 try{const m=localStorage.getItem("bxc-mood");if(m&&MOODS.some(x=>x.k===m))S.mood=m}catch(e){}
 const $=id=>document.getElementById(id);
 $("total").textContent=TRACKS.length;
-$("updated").textContent=UPDATED?"Playlist last checked: "+UPDATED+". It refreshes automatically every two days.":"";
+$("updated").textContent=UPDATED?"Playlist last checked: "+UPDATED+". It refreshes automatically every morning.":"";
 
 function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
 function chip(el,label,on,fn){const b=document.createElement("button");b.type="button";b.className="chip";b.textContent=label;b.setAttribute("aria-pressed",on);b.onclick=fn;el.appendChild(b);return b}
@@ -302,5 +325,59 @@ $("list").addEventListener("click",e=>{const b=e.target.closest("button.play");i
 $("next").onclick=()=>load(P.i+1);
 $("prev").onclick=()=>load(Math.max(0,P.i-1));
 $("closeDock").onclick=()=>{try{P.ctl&&P.ctl.pause()}catch(e){};$("dock").hidden=true;document.body.classList.remove("docked");P.q=[];mark()};
+// ---- Missing-songs catcher: compare a WhatsApp export with the playlist ----
+const INPL=new Set(TRACKS.map(t=>t.id));
+function parseChat(text){
+  const lines=text.split(/\r?\n/);let date="";const found=new Map(),short=new Map(),other=new Map(),albums=new Map();
+  const dateRe=/^\[?(\d{1,2}[\/.]\d{1,2}[\/.]\d{2,4})/;
+  for(const ln of lines){
+    const dm=ln.match(dateRe);if(dm)date=dm[1];
+    for(const m of ln.matchAll(/open\.spotify\.com\/(?:intl-[a-z]{2}\/)?track\/([A-Za-z0-9]{22})/g)) if(!found.has(m[1]))found.set(m[1],{date,line:ln});
+    for(const m of ln.matchAll(/open\.spotify\.com\/(?:intl-[a-z]{2}\/)?(album|playlist)\/([A-Za-z0-9]{22})/g)){const u=`https://open.spotify.com/${m[1]}/${m[2]}`;if(!albums.has(u))albums.set(u,{date,kind:m[1]})}
+    for(const m of ln.matchAll(/https?:\/\/spotify\.link\/[A-Za-z0-9]+/g)) if(!short.has(m[0]))short.set(m[0],{date});
+    for(const m of ln.matchAll(/https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/watch\S+|youtu\.be\/\S+|music\.youtube\.com\/\S+|music\.apple\.com\/\S+|soundcloud\.com\/\S+|[a-z0-9-]+\.bandcamp\.com\/\S+|tidal\.com\/\S+|deezer\.com\/\S+)/g)){const u=m[0].replace(/[).,]+$/,"");if(!other.has(u))other.set(u,{date})}
+  }
+  return {found,short,other,albums};
+}
+async function readFile(f){
+  if(/\.zip$/i.test(f.name)||f.type.includes("zip")){
+    if(!window.JSZip)await new Promise((ok,bad)=>{const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";s.onload=ok;s.onerror=bad;document.head.appendChild(s)});
+    const z=await JSZip.loadAsync(f);const e=Object.values(z.files).find(x=>/\.txt$/i.test(x.name));
+    if(!e)throw new Error("no .txt chat file inside the zip");return e.async("string");
+  }
+  return f.text();
+}
+async function title(id){
+  try{const r=await fetch("https://open.spotify.com/oembed?url=https://open.spotify.com/track/"+id);if(!r.ok)return null;const j=await r.json();return j.title||null}catch(e){return null}
+}
+async function runCatch(f){
+  const out=$("catchOut");out.innerHTML='<p class="sub">Reading the chat…</p>';
+  let text;try{text=await readFile(f)}catch(e){out.innerHTML=`<p class="sub">Couldn't read that file (${esc(String(e.message||e))}). Use WhatsApp's Export chat, Without media, and drop the .txt or .zip it makes.</p>`;return}
+  const {found,short,other,albums}=parseChat(text);
+  const missing=[...found].filter(([id])=>!INPL.has(id)).map(([id,v])=>({id,date:v.date}));
+  const total=found.size;
+  let h=`<div class="bar" style="border-top:none;padding-top:0"><div class="count">${missing.length} missing<small>${total} Spotify songs shared in this export · ${total-missing.length} already in the playlist</small></div>`;
+  if(missing.length)h+=`<div class="btns"><button class="btn primary" id="copyMissing" type="button">Copy all missing links</button></div>`;
+  h+=`</div>`;
+  if(missing.length){
+    h+=`<p class="sub">Paste them into the playlist in the Spotify desktop app: open the playlist, click the track list, and paste. A song can show as missing if the playlist already has a different release of it.</p><ul class="mlist" id="mlist">`+missing.map(m=>`<li data-id="${m.id}"><span class="mt">Loading title…</span><span class="md">Shared ${esc(m.date||"")}</span><a href="https://open.spotify.com/track/${m.id}" target="_blank" rel="noopener">Spotify ↗</a></li>`).join("")+`</ul>`;
+  }
+  if(short.size)h+=`<p class="mhead">Short spotify.link links, not checked (${short.size})</p><ul class="mlist">`+[...short].map(([u,v])=>`<li><span class="mt">${esc(u)}</span><span class="md">Shared ${esc(v.date||"")} · open it to see the song</span><a href="${esc(u)}" target="_blank" rel="noopener">Open ↗</a></li>`).join("")+`</ul>`;
+  if(albums.size)h+=`<p class="mhead">Albums and playlists shared (${albums.size})</p><ul class="mlist">`+[...albums].map(([u,v])=>`<li><span class="mt">${v.kind==="album"?"Album":"Playlist"}</span><span class="md">Shared ${esc(v.date||"")}</span><a href="${u}" target="_blank" rel="noopener">Open ↗</a></li>`).join("")+`</ul>`;
+  if(other.size)h+=`<p class="mhead">Shared from other services (${other.size})</p><ul class="mlist">`+[...other].map(([u,v])=>`<li><span class="mt">${esc(u.replace(/^https?:\/\/(www\.)?/,"").slice(0,60))}</span><span class="md">Shared ${esc(v.date||"")} · find it on Spotify by hand</span><a href="${esc(u)}" target="_blank" rel="noopener">Open ↗</a></li>`).join("")+`</ul>`;
+  if(!total&&!short.size&&!other.size)h=`<p class="sub">No music links found in that file. Check it's the group's chat export.</p>`;
+  out.innerHTML=h;
+  if(missing.length){
+    $("copyMissing").onclick=()=>{const txt=missing.map(m=>"https://open.spotify.com/track/"+m.id).join("\n");
+      try{navigator.clipboard.writeText(txt).then(()=>toast(`Copied ${missing.length} links`),()=>{$("fallback").value=txt;$("fallbackBox").hidden=false;$("fallback").select()})}catch(e){}};
+    for(const m of missing){const li=out.querySelector(`li[data-id="${m.id}"] .mt`);title(m.id).then(t=>{if(li)li.textContent=t||"Title unavailable, open in Spotify to check"})}
+  }
+}
+$("chatfile").onchange=e=>{const f=e.target.files[0];if(f)runCatch(f)};
+const dz=$("drop");["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("over")}));
+["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("over")}));
+dz.addEventListener("drop",e=>{const f=e.dataTransfer.files[0];if(f)runCatch(f)});
+if(location.hash==="#missing")$("catch").open=true;
+
 renderMoods();renderFilters();update(true);
 </script>
