@@ -20,7 +20,7 @@
 body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body);margin:0}
 .wrap{max-width:860px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:flex;flex-direction:column;gap:22px}
 header{display:flex;flex-direction:column;gap:6px}
-.brand{font:400 clamp(30px,8vw,52px)/0.95 var(--display);letter-spacing:-.01em;margin:0;text-wrap:balance}
+.brand{font:400 min(52px,calc((100vw - 32px) / 15.5))/1 var(--display);letter-spacing:-.01em;margin:0;white-space:nowrap}
 .brand span{color:var(--hot)}
 .sub{color:var(--muted);margin:0;max-width:60ch}
 .sub b{color:var(--ink);font-weight:700}
@@ -116,7 +116,7 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
 
 <div class="wrap">
   <header>
-    <h1 class="brand">Bangers<br>Xchange <span>Club</span></h1>
+    <h1 class="brand">Bangers Xchange <span>Club</span></h1>
     <p class="sub">Pick a mood and dip into the club's playlist. <b id="total"></b> tracks, tagged by hand for energy, mood and genre. Hit <b>Play these</b> and they play one after another right here.</p>
   </header>
 
