@@ -27,7 +27,6 @@ header{display:flex;flex-direction:column;gap:6px}
 .label{font:500 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
 .moods{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 @media (min-width:720px){.moods{grid-template-columns:repeat(5,minmax(0,1fr))}}
-.mood.wide[aria-pressed="true"]{transform:none}
 .mood.wide{grid-column:1/-1;flex-direction:row;align-items:baseline;gap:10px;padding-block:10px}
 .mood{all:unset;cursor:pointer;background:var(--card);border:1.5px solid var(--line);border-radius:6px 18px 6px 6px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;transition:transform .12s,border-color .12s}
 .mood:hover{transform:translateY(-2px);border-color:var(--ink)}
@@ -35,7 +34,7 @@ header{display:flex;flex-direction:column;gap:6px}
 .mood .n{font:400 17px/1.1 var(--display)}
 .mood .d{font-size:13px;color:var(--muted)}
 .mood .c{font:500 11px/1 var(--mono);color:var(--muted)}
-.mood[aria-pressed="true"]{background:var(--hot);border-color:var(--hot);color:var(--hot-ink);transform:rotate(-1.2deg)}
+.mood[aria-pressed="true"]{background:var(--hot);border-color:var(--hot);color:var(--hot-ink)}
 .mood[aria-pressed="true"] .d,.mood[aria-pressed="true"] .c{color:var(--hot-ink);opacity:.85}
 .panel{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:20px;align-items:start}
 @media (max-width:640px){.panel{grid-template-columns:minmax(0,1fr)}.map{order:-1}}
@@ -112,7 +111,7 @@ body.docked .wrap{padding-bottom:200px}
 .mhead{font:500 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:8px 0 0}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:700;font-size:14px;z-index:5}
 textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}.mood[aria-pressed="true"]{transform:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
 <div class="wrap">
