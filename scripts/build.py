@@ -9,7 +9,8 @@ tracks = {t["id"]: t for t in json.load(open(os.path.join(ROOT, "data", "tracks.
 playlist = json.load(open(os.path.join(ROOT, "data", "playlist.json"), encoding="utf-8"))["tracks"]
 
 # Playlist order, newest additions last; only tracks currently in the playlist.
-rows = [tracks[p["id"]] for p in playlist if p["id"] in tracks]
+_seen = set()
+rows = [tracks[p["id"]] for p in playlist if p["id"] in tracks and not (p["id"] in _seen or _seen.add(p["id"]))]
 
 # YouTube versions for the YouTube player (overrides win over automatic matches).
 def _load(name):

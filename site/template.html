@@ -583,29 +583,59 @@ async function readFile(f){
 async function title(id){
   try{const r=await fetch("https://open.spotify.com/oembed?url=https://open.spotify.com/track/"+id);if(!r.ok)return null;const j=await r.json();return j.title||null}catch(e){return null}
 }
+// Songs copied/added from here recently: the playlist data only refreshes at 4am, so remember
+// them for a few days to stop the same songs being offered (and pasted) twice.
+const RECENT_KEY="bxc-copied",RECENT_DAYS=4;
+function recentGet(){let r={};try{r=JSON.parse(localStorage.getItem(RECENT_KEY)||"{}")}catch(e){}
+  const cut=Date.now()-RECENT_DAYS*864e5;for(const k in r)if(r[k]<cut||INPL.has(k))delete r[k];return r}
+function recentAdd(ids){const r=recentGet(),now=Date.now();ids.forEach(id=>r[id]=now);try{localStorage.setItem(RECENT_KEY,JSON.stringify(r))}catch(e){}}
+// Same title as a playlist song = maybe the same song under another Spotify ID (Spotify's title
+// lookup gives no artist, so the person confirms with "Include anyway"). Version tags
+// like "(2009 Remaster)" are kept in the comparison, so different versions still count as new.
+const normT=x=>(x||"").toLowerCase().replace(/&/g,"and").replace(/[^a-z0-9]+/g," ").trim();
+const PL_TITLES=new Map();TRACKS.forEach(t=>{const k=normT(t.t);if(!PL_TITLES.has(k))PL_TITLES.set(k,[]);PL_TITLES.get(k).push(t)});
 async function runCatch(f){
   const out=$("catchOut");out.innerHTML='<p class="sub">Reading the chat…</p>';
   let text;try{text=await readFile(f)}catch(e){out.innerHTML=`<p class="sub">Couldn't read that file (${esc(String(e.message||e))}). Use WhatsApp's Export chat, Without media, and drop the .txt or .zip it makes.</p>`;return}
   const {found,short,other,albums}=parseChat(text);
-  const missing=[...found].filter(([id])=>!INPL.has(id)).map(([id,v])=>({id,date:v.date}));
+  const recent=recentGet();
+  const notIn=[...found].filter(([id])=>!INPL.has(id)).map(([id,v])=>({id,date:v.date}));
+  const missing=notIn.filter(m=>!recent[m.id]);
+  const skippedRecent=notIn.length-missing.length;
+  const maybe=new Map();                       // id -> playlist track it seems to duplicate
   const total=found.size;
-  let h=`<div class="bar" style="border-top:none;padding-top:0"><div class="count">${missing.length} missing<small>${total} Spotify songs shared in this export · ${total-missing.length} already in the playlist</small></div>`;
+  const live=()=>missing.filter(m=>!maybe.has(m.id));
+  let h=`<div class="bar" style="border-top:none;padding-top:0"><div class="count">${missing.length} missing<small>${total} Spotify songs shared in this export · ${total-notIn.length} already in the playlist</small></div>`;
   if(missing.length)h+=`<div class="btns">${SPOTIFY_CLIENT_ID?`<button class="btn primary" id="addMissing" type="button">Add all ${missing.length} to the playlist</button>`:""}<button class="btn${SPOTIFY_CLIENT_ID?"":" primary"}" id="copyMissing" type="button">Copy all missing links</button></div><p class="sub" id="addStatus" hidden></p>`;
   h+=`</div>`;
+  if(skippedRecent)h+=`<p class="hint" style="margin:0">${skippedRecent} ${skippedRecent===1?"song was":"songs were"} copied or added from here in the last few days, so ${skippedRecent===1?"it's":"they're"} left out to avoid adding ${skippedRecent===1?"it":"them"} twice. The playlist data catches up at the 4am refresh.</p>`;
   if(missing.length){
-    h+=`<p class="hint" style="margin:0">${SPOTIFY_CLIENT_ID?"Tap Add all to put them in the playlist. You'll be asked to sign in to Spotify the first time.":"On a computer, paste the copied links into the playlist in the Spotify app."} A song can show as missing if the playlist already has a different release of it.</p><ul class="mlist" id="mlist">`+missing.map(m=>`<li data-id="${m.id}"><span class="mt">Loading title…</span><span class="md">Shared ${esc(m.date||"")}</span><a href="https://open.spotify.com/track/${m.id}" target="_blank" rel="noopener">Spotify ↗</a></li>`).join("")+`</ul>`;
+    h+=`<p class="hint" style="margin:0" id="dupNote" hidden></p><p class="hint" style="margin:0">${SPOTIFY_CLIENT_ID?"Tap Add all to put them in the playlist. You'll be asked to sign in to Spotify the first time.":"On a computer, paste the copied links into the playlist in the Spotify app."}</p><ul class="mlist" id="mlist">`+missing.map(m=>`<li data-id="${m.id}"><span class="mt">Loading title…</span><span class="md">Shared ${esc(m.date||"")}</span><a href="https://open.spotify.com/track/${m.id}" target="_blank" rel="noopener">Spotify ↗</a></li>`).join("")+`</ul>`;
   }
   if(short.size)h+=`<p class="mhead">Short spotify.link links, not checked (${short.size})</p><ul class="mlist">`+[...short].map(([u,v])=>`<li><span class="mt">${esc(u)}</span><span class="md">Shared ${esc(v.date||"")} · open it to see the song</span><a href="${esc(u)}" target="_blank" rel="noopener">Open ↗</a></li>`).join("")+`</ul>`;
   if(albums.size)h+=`<p class="mhead">Albums and playlists shared (${albums.size})</p><ul class="mlist">`+[...albums].map(([u,v])=>`<li><span class="mt">${v.kind==="album"?"Album":"Playlist"}</span><span class="md">Shared ${esc(v.date||"")}</span><a href="${u}" target="_blank" rel="noopener">Open ↗</a></li>`).join("")+`</ul>`;
   if(other.size)h+=`<p class="mhead">Shared from other services (${other.size})</p><ul class="mlist">`+[...other].map(([u,v])=>`<li><span class="mt">${esc(u.replace(/^https?:\/\/(www\.)?/,"").slice(0,60))}</span><span class="md">Shared ${esc(v.date||"")} · find it on Spotify by hand</span><a href="${esc(u)}" target="_blank" rel="noopener">Open ↗</a></li>`).join("")+`</ul>`;
   if(!total&&!short.size&&!other.size)h=`<p class="sub">No music links found in that file. Check it's the group's chat export.</p>`;
+  else if(total&&!missing.length&&!skippedRecent)h+=`<p class="sub">Nothing missing. Every shared song is already in the playlist.</p>`;
   out.innerHTML=h;
-  if(missing.length){
-    if(SPOTIFY_CLIENT_ID)$("addMissing").onclick=()=>addToPlaylist(missing.map(m=>m.id));
-    $("copyMissing").onclick=()=>{const txt=missing.map(m=>"https://open.spotify.com/track/"+m.id).join("\n");
-      try{navigator.clipboard.writeText(txt).then(()=>toast(`Copied ${missing.length} links`),()=>{$("fallback").value=txt;$("fallbackBox").hidden=false;$("fallback").select()})}catch(e){}};
-    for(const m of missing){const li=out.querySelector(`li[data-id="${m.id}"] .mt`);title(m.id).then(t=>{if(li)li.textContent=t||"Title unavailable, open in Spotify to check"})}
-  }
+  if(!missing.length)return;
+  const relabel=()=>{const n=live().length;
+    if($("addMissing"))$("addMissing").textContent=`Add all ${n} to the playlist`;
+    $("copyMissing").textContent=n===missing.length?"Copy all missing links":`Copy ${n} missing links`;
+    const k=maybe.size,note=$("dupNote");note.hidden=!k;
+    if(k)note.textContent=`${k} ${k===1?"looks like it's":"look like they're"} already in the playlist under a different link (same title), so ${k===1?"it's":"they're"} left out. If it's actually a different song, tap Include.`};
+  if(SPOTIFY_CLIENT_ID)$("addMissing").onclick=async()=>{const ids=live().map(m=>m.id);recentAdd(ids);await addToPlaylist(ids)};
+  $("copyMissing").onclick=()=>{const ids=live().map(m=>m.id);if(!ids.length){toast("Nothing left to copy");return}
+    const txt=ids.map(id=>"https://open.spotify.com/track/"+id).join("\n");
+    const done=()=>{recentAdd(ids);toast(`Copied ${ids.length} links`)};
+    try{navigator.clipboard.writeText(txt).then(done,()=>{$("fallback").value=txt;$("fallbackBox").hidden=false;$("fallback").select();recentAdd(ids)})}catch(e){}};
+  for(const m of missing){const li=out.querySelector(`li[data-id="${m.id}"]`);
+    title(m.id).then(t=>{if(!li)return;li.querySelector(".mt").textContent=t||"Title unavailable, open in Spotify to check";
+      const twins=t?PL_TITLES.get(normT(t)):null;
+      if(twins&&twins.length){maybe.set(m.id,twins[0]);li.style.opacity=".6";
+        const md=li.querySelector(".md");md.textContent=`Playlist already has: ${twins.map(x=>x.t+" · "+x.a).join(" / ")} · left out `;
+        const inc=document.createElement("button");inc.type="button";inc.className="chip";inc.textContent="Include";inc.style.marginLeft="4px";
+        inc.onclick=()=>{maybe.delete(m.id);li.style.opacity="";md.textContent=`Included · shared ${m.date||""}`;relabel()};md.appendChild(inc);relabel()}})}
 }
 // ---- Add straight to the playlist (Spotify sign-in, PKCE, no secret in the page) ----
 const SPOTIFY_CLIENT_ID="__SPOTIFY_CLIENT_ID__".startsWith("__")?"":"__SPOTIFY_CLIENT_ID__";
