@@ -45,6 +45,16 @@ header{display:flex;flex-direction:column;gap:6px}
 .chip:focus-visible{outline:2px solid var(--sun);outline-offset:2px}
 .search{width:100%;font:inherit;padding:10px 12px;border-radius:8px;border:1.5px solid var(--line);background:var(--card);color:var(--ink)}
 .search:focus{outline:none;border-color:var(--ink)}
+.searchrow{display:flex;gap:8px;align-items:stretch}
+.searchrow .search{flex:1;min-width:0}
+.src{display:inline-flex;flex:none;border:1.5px solid var(--ink);border-radius:8px;overflow:hidden}
+.src button{all:unset;cursor:pointer;font-weight:700;font-size:13px;padding:0 12px;display:flex;align-items:center;color:var(--ink)}
+.src button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.src button:focus-visible{outline:3px solid var(--sun);outline-offset:-3px}
+body.ytmode .trk[data-noyt] .play{opacity:.3}
+.ytbox{width:100%;max-width:356px;height:200px;margin:0 auto;border-radius:12px;overflow:hidden;background:#000}
+.ytbox iframe{display:block;width:100%;height:100%}
+body.docked.ytmode .wrap{padding-bottom:330px}
 .map{background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:10px}
 .map svg{display:block;width:100%;height:auto}
 .map p{margin:6px 0 0;font-size:12px;color:var(--muted)}
@@ -147,7 +157,13 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
       </div>
       <div>
         <label class="label" for="q">Search artist or title</label>
-        <input class="search" id="q" type="search" placeholder="e.g. Kate Bush, dub, Marvin" autocomplete="off">
+        <div class="searchrow">
+          <input class="search" id="q" type="search" placeholder="e.g. Kate Bush, dub, Marvin" autocomplete="off">
+          <div class="src" role="group" aria-label="Play songs from">
+            <button type="button" id="srcSp" aria-pressed="true">Spotify</button>
+            <button type="button" id="srcYt" aria-pressed="false">YouTube</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="map" aria-hidden="true">
@@ -194,6 +210,7 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
   <details class="catch about">
     <summary>How this works</summary>
     <p><b>Playing:</b> songs play in the player at the bottom of the screen and move on by themselves. On a computer, sign in at open.spotify.com in the same browser to hear full songs; otherwise Spotify plays 30-second previews. Or tap <b>Play full songs here</b> once and sign in with Spotify: from then on everything plays in full, right in this page, one song after another (needs Spotify Premium). On iPhone, keep the screen on; if it has to be locked, use <b>Play these in the Spotify app</b> instead.</p>
+    <p><b>Spotify or YouTube:</b> the switch next to the search box picks where songs play from. YouTube plays full songs for everyone, no account needed, one after another; keep the screen on while it plays. Songs YouTube doesn't have yet are greyed out and get skipped.</p>
     <p><b>Spotify ↗:</b> opens a single song in the Spotify app.</p>
     <p><b>Copy as playlist:</b> copies the links for the songs on screen. On a computer, paste them into an empty playlist in the Spotify app and they all drop in.</p>
     <p><b>Tags:</b> energy, mood and genre are judgement calls, not Spotify data. Songs marked <span class="guess">~</span> were harder to place.</p>
@@ -213,6 +230,7 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
       </span>
     </div>
     <div id="embed"></div>
+    <div class="ytbox" id="ytbox" hidden><div id="ytplayer"></div></div>
     <button type="button" class="dock-app" id="playHere" hidden>▶ Play full songs here: sign in with Spotify</button>
     <button type="button" class="dock-app alt" id="playApp" hidden>Or play these in the Spotify app ↗</button>
     <p class="app-status" id="appStatus" hidden></p>
@@ -289,7 +307,7 @@ function update(reshuffle){
   $("shuffle").textContent=S.mode==="all"?"Shuffle 12":"Shuffle again";
   const ul=$("list");
   if(!f.length){ul.innerHTML=`<li class="empty">Nothing fits all of those picks. Try clearing a genre or era.</li>`}
-  else ul.innerHTML=S.shown.map((t,k)=>`<li class="trk${P.q[P.i]&&P.q[P.i].id===t.id?" now":""}" data-id="${t.id}">
+  else ul.innerHTML=S.shown.map((t,k)=>`<li class="trk${P.q[P.i]&&P.q[P.i].id===t.id?" now":""}" data-id="${t.id}"${t.yt?"":" data-noyt"}>
     <span class="t">${esc(t.t)}</span>
     <span class="a">${esc(t.a)}${t.y?" · "+t.y:""}</span>
     <span class="meta">${t.pending?"":`<span class="meter" title="Energy ${t.e} of 5">${[1,2,3,4,5].map(i=>`<i class="${i<=t.e?"on":""}" style="height:${3+i*2}px"></i>`).join("")}</span>`}${t.g.map(g=>`<span class="tag">${G[g]}</span>`).join("")}${t.pending?'<span class="tag">New · tags coming</span>':t.lc?'<span class="guess" title="Harder to place, tags are a best guess">~</span>':""}</span>
@@ -335,6 +353,8 @@ function load(i){
 }
 function start(q,i){
   if(!q.length)return;
+  if(SRC==="yt"){ytStart(q,i);return}
+  $("ytbox").hidden=true;try{Y.player&&Y.ready&&Y.player.pauseVideo()}catch(e){}$("playApp").hidden=!SPOTIFY_CLIENT_ID;
   if(sdkOn()){sdkStart(q,i);return}
   P.mode="embed";$("embed").classList.remove("off");$("pause").hidden=true;setHereBtn();
   P.q=q.slice();document.body.classList.add("docked");$("dock").hidden=false;
@@ -358,9 +378,61 @@ function start(q,i){
 }
 $("playall").onclick=()=>{if(!S.shown.length){toast("No tracks to play");return}start(S.shown,0)};
 $("list").addEventListener("click",e=>{const b=e.target.closest("button.play");if(!b)return;start(S.shown,+b.dataset.i)});
-$("next").onclick=()=>{if(P.mode==="sdk")SDK.player&&SDK.player.nextTrack();else load(P.i+1)};
-$("prev").onclick=()=>{if(P.mode==="sdk")SDK.player&&SDK.player.previousTrack();else load(Math.max(0,P.i-1))};
-$("closeDock").onclick=()=>{$("appStatus").hidden=true;try{P.ctl&&P.ctl.pause()}catch(e){};try{SDK.player&&P.mode==="sdk"&&SDK.player.pause()}catch(e){};$("dock").hidden=true;document.body.classList.remove("docked");P.q=[];mark()};
+$("next").onclick=()=>{if(P.mode==="yt")ytLoad(P.i+1);else if(P.mode==="sdk")SDK.player&&SDK.player.nextTrack();else load(P.i+1)};
+$("prev").onclick=()=>{if(P.mode==="yt")ytLoad(Math.max(0,P.i-1));else if(P.mode==="sdk")SDK.player&&SDK.player.previousTrack();else load(Math.max(0,P.i-1))};
+function closeDock(){try{Y.player&&Y.ready&&Y.player.pauseVideo()}catch(e){}$("appStatus").hidden=true;try{P.ctl&&P.ctl.pause()}catch(e){};try{SDK.player&&P.mode==="sdk"&&SDK.player.pause()}catch(e){};$("dock").hidden=true;document.body.classList.remove("docked");P.q=[];mark()}
+$("closeDock").onclick=closeDock;
+// ---- YouTube player: full songs for everyone, no account ----
+let SRC=(()=>{try{return localStorage.getItem("bxc_src")==="yt"?"yt":"sp"}catch(e){return "sp"}})();
+const Y={api:false,player:null,ready:false,pending:null};
+function loadYT(){
+  if(window.YT&&YT.Player){Y.api=true;return}
+  if(document.getElementById("ytjs"))return;
+  window.onYouTubeIframeAPIReady=()=>{Y.api=true;if(Y.pending!==null){const k=Y.pending;Y.pending=null;ytLoad(k)}};
+  const sc=document.createElement("script");sc.id="ytjs";sc.src="https://www.youtube.com/iframe_api";document.head.appendChild(sc);
+}
+function setSrc(v){
+  if(v===SRC)return;
+  SRC=v;try{localStorage.setItem("bxc_src",v)}catch(e){}
+  $("srcSp").setAttribute("aria-pressed",String(v==="sp"));$("srcYt").setAttribute("aria-pressed",String(v==="yt"));
+  document.body.classList.toggle("ytmode",v==="yt");
+  if(v==="yt"){loadYT();const n=TRACKS.filter(t=>t.yt).length;if(n<TRACKS.length)toast(n?`${n} of ${TRACKS.length} songs are on YouTube so far`:"YouTube versions are still being found, check back soon",3500)}
+  if(!$("dock").hidden)closeDock();
+}
+$("srcSp").onclick=()=>setSrc("sp");$("srcYt").onclick=()=>setSrc("yt");
+if(SRC==="yt"){$("srcSp").setAttribute("aria-pressed","false");$("srcYt").setAttribute("aria-pressed","true");document.body.classList.add("ytmode");loadYT()}
+function ytStart(q,i){
+  const list=q.filter(t=>t.yt);
+  if(!list.length){toast("None of these songs are on YouTube yet",3000);return}
+  let k=-1;for(let j=i;j<q.length&&k<0;j++)k=list.indexOf(q[j]);
+  if(k<0)k=0;
+  if(!q[i].yt)toast("That one isn't on YouTube yet, so starting from the next song",3500);
+  P.q=list;P.mode="yt";
+  document.body.classList.add("docked");$("dock").hidden=false;$("embed").classList.add("off");$("ytbox").hidden=false;
+  $("pause").hidden=false;$("pause").textContent="⏸ Pause";$("playHere").hidden=true;$("playApp").hidden=true;appMsg("");
+  try{P.ctl&&P.ctl.pause()}catch(e){}try{SDK.player&&SDK.player.pause()}catch(e){}
+  ytLoad(k);
+}
+function ytLoad(k){
+  if(k<0||k>=P.q.length){if(k>=P.q.length)toast("That's the end of the selection");return}
+  P.i=k;mark();
+  const vid=P.q[k].yt;
+  if(Y.player&&Y.ready){Y.player.loadVideoById(vid);return}
+  if(!Y.api){Y.pending=k;loadYT();$("dockNow").textContent="Loading YouTube…";return}
+  if(Y.player)return;                       // still starting up; it plays the current song when ready
+  Y.player=new YT.Player("ytplayer",{width:"100%",height:"100%",videoId:vid,
+    playerVars:{autoplay:1,playsinline:1,rel:0},
+    events:{
+      onReady:e=>{Y.ready=true;const want=P.q[P.i]&&P.q[P.i].yt;if(want&&want!==vid)e.target.loadVideoById(want);else e.target.playVideo()},
+      onStateChange:e=>{
+        if(e.data===YT.PlayerState.ENDED)ytLoad(P.i+1);
+        else if(e.data===YT.PlayerState.PLAYING){$("pause").textContent="⏸ Pause";appMsg("")}
+        else if(e.data===YT.PlayerState.PAUSED)$("pause").textContent="▶ Play";
+      },
+      onError:()=>{toast("That video won't play here, skipping",2500);setTimeout(()=>ytLoad(P.i+1),600)}
+    }});
+  setTimeout(()=>{try{if(P.mode==="yt"&&Y.player.getPlayerState()!==1)appMsg("If nothing's playing, tap the video once. Phones want one tap the first time.")}catch(e){}},5000);
+}
 // ---- Missing-songs catcher: compare a WhatsApp export with the playlist ----
 const INPL=new Set(TRACKS.map(t=>t.id));
 function parseChat(text){
@@ -541,7 +613,8 @@ function sdkStart(q,i){
     if(q.length-base>100)appMsg("Playing the next 100 songs. Tap ▶ on a later song to carry on past that.");
   })();
 }
-$("pause").onclick=()=>{if(!SDK.player)return;SDK.player.activateElement();if(P.mode!=="sdk")return;if(!SDK.deviceId){sdkStart(P.q,P.i);return}
+$("pause").onclick=()=>{if(P.mode==="yt"){if(Y.player&&Y.ready){Y.player.getPlayerState()===1?Y.player.pauseVideo():Y.player.playVideo()}return}
+  if(!SDK.player)return;SDK.player.activateElement();if(P.mode!=="sdk")return;if(!SDK.deviceId){sdkStart(P.q,P.i);return}
   SDK.player.getCurrentState().then(st=>{if(st)SDK.player.togglePlay();else sdkStart(P.q,P.i)})};
 
 // ---- Hand the queue to the person's Spotify app instead (keeps going on a locked phone) ----
