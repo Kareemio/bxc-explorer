@@ -95,6 +95,69 @@ footer{color:var(--muted);font-size:13px;display:flex;flex-direction:column;gap:
 .dock-app.alt{background:none;color:var(--ink);border:1.5px solid var(--ink);font-size:13px;padding:8px 12px}
 #embed.off{display:none}
 [hidden]{display:none!important}
+/* Phone-only extras: invisible on desktop */
+.mood-desc,.ftools,.src-bar,.more-btn,.more-menu,.dock-app .short{display:none}
+.filters{display:flex;flex-direction:column;gap:14px}
+.bar{position:relative}
+.dock-links{display:contents}
+@media (max-width:640px){
+  .wrap{gap:16px;padding-block:16px 40px}
+  /* 1. moods: one swipeable row of pills */
+  .moods{position:relative;display:flex;overflow-x:auto;gap:8px;margin-inline:-16px;padding:2px 16px 6px;scroll-snap-type:x proximity;scrollbar-width:none}
+  .moods::-webkit-scrollbar{display:none}
+  .mood,.mood.wide{flex:none;flex-direction:row;align-items:baseline;gap:6px;padding:9px 14px;border-radius:999px;scroll-snap-align:start;grid-column:auto}
+  .mood:hover{transform:none}
+  .mood .n{font-size:15px}
+  .mood .d{display:none}
+  .mood-desc{display:block;margin:8px 0 0;font-size:14px;color:var(--muted)}
+  /* 2. no map */
+  .map{display:none}
+  /* 3. filters behind a button */
+  .refine{gap:12px}
+  .searchwrap{order:1}
+  .ftools{order:2;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .filters{order:3;display:none;background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:14px}
+  .filters.open{display:flex}
+  #filtersBtn{padding:8px 14px;font-size:14px}
+  #filtersBtn .badge{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:6px;border-radius:999px;background:var(--hot);color:var(--hot-ink);font-size:12px}
+  #activeChips{display:contents}
+  #activeChips .chip{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  /* 5. search full width; switch moves to the results bar */
+  .searchrow .src{display:none}
+  /* 6. sticky results bar */
+  .bar{position:sticky;top:0;z-index:3;background:var(--bg);padding:10px 0;gap:8px;margin-inline:-16px;padding-inline:16px;border-top:none;box-shadow:0 2px 0 var(--ink)}
+  .count{font-size:17px}
+  .count small{display:none}
+  .btns{width:100%;flex-wrap:nowrap;gap:6px;align-items:stretch}
+  #shuffle,#showall,#copy{display:none}
+  #playall{padding:9px 12px;white-space:nowrap}
+  .src-bar{display:inline-flex;margin-left:auto}
+  .more-btn{display:inline-block;padding:9px 12px}
+  .more-menu{position:absolute;right:16px;top:100%;margin-top:4px;display:flex;flex-direction:column;background:var(--card);border:1.5px solid var(--ink);border-radius:10px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:4}
+  .more-menu[hidden]{display:none}
+  .more-menu button{all:unset;cursor:pointer;padding:12px 18px;font-weight:700;font-size:15px;border-bottom:1px solid var(--line)}
+  .more-menu button:last-child{border-bottom:none}
+  /* 4. two-line track rows, tap anywhere to play */
+  .trk{padding:10px 2px;gap:2px 12px;cursor:pointer}
+  .trk .meta,.trk .ext{display:none}
+  .trk .a{font-size:14px}
+  .play{width:40px;height:40px}
+  /* 7. compact mini-player */
+  .dock{padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px))}
+  .dock-in{gap:6px}
+  .dock-top{flex-wrap:nowrap}
+  .dock-now{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}
+  .dock-ctl{flex:none;gap:4px}
+  .dock-ctl button{padding:7px 10px;font-size:15px}
+  .dock-ctl .w{display:none}
+  .dock-links{display:flex;gap:16px;justify-content:center}
+  .dock-app,.dock-app.alt{width:auto;background:none;border:none;color:var(--ink);padding:4px 2px;font-size:13px;text-decoration:underline;text-underline-offset:3px}
+  .dock-app .long{display:none}
+  .dock-app .short{display:inline}
+  .app-status{font-size:12px;text-align:center}
+  body.docked .wrap{padding-bottom:150px}
+  body.docked.ytmode .wrap{padding-bottom:310px}
+}
 .dock-app:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 .app-status{font-size:13px;color:var(--muted);margin:0}
 .dock-ctl button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
@@ -139,10 +202,16 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
   <section aria-labelledby="moodLabel">
     <p class="label" id="moodLabel">What's the mood?</p>
     <div class="moods" id="moods"></div>
+    <p class="mood-desc" id="moodDesc"></p>
   </section>
 
   <section class="panel">
     <div class="refine">
+      <div class="ftools" id="ftools">
+        <button class="btn" id="filtersBtn" type="button" aria-expanded="false" aria-controls="filtersBox">Filters</button>
+        <div class="chips" id="activeChips"></div>
+      </div>
+      <div class="filters" id="filtersBox">
       <div>
         <p class="label">Energy</p>
         <div class="chips" id="energy"></div>
@@ -155,13 +224,14 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
         <p class="label">Era</p>
         <div class="chips" id="decades"></div>
       </div>
-      <div>
+      </div>
+      <div class="searchwrap">
         <label class="label" for="q">Search artist or title</label>
         <div class="searchrow">
           <input class="search" id="q" type="search" placeholder="e.g. Kate Bush, dub, Marvin" autocomplete="off">
           <div class="src" role="group" aria-label="Play songs from">
-            <button type="button" id="srcSp" aria-pressed="true">Spotify</button>
-            <button type="button" id="srcYt" aria-pressed="false">YouTube</button>
+            <button type="button" id="srcSp" class="src-sp" aria-pressed="true">Spotify</button>
+            <button type="button" id="srcYt" class="src-yt" aria-pressed="false">YouTube</button>
           </div>
         </div>
       </div>
@@ -180,6 +250,16 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
         <button class="btn" id="shuffle" type="button">Shuffle 12</button>
         <button class="btn" id="showall" type="button">Show all</button>
         <button class="btn" id="copy" type="button">Copy as playlist</button>
+        <div class="src src-bar" role="group" aria-label="Play songs from">
+          <button type="button" class="src-sp" aria-pressed="true">Spotify</button>
+          <button type="button" class="src-yt" aria-pressed="false">YouTube</button>
+        </div>
+        <button class="btn more-btn" id="moreBtn" type="button" aria-label="More options" aria-expanded="false">⋯</button>
+      </div>
+      <div class="more-menu" id="moreMenu" hidden>
+        <button type="button" id="mShuffle">Shuffle 12</button>
+        <button type="button" id="mShowall">Show all</button>
+        <button type="button" id="mCopy">Copy as playlist</button>
       </div>
     </div>
     <div id="fallbackBox" hidden>
@@ -210,7 +290,7 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
   <details class="catch about">
     <summary>How this works</summary>
     <p><b>Playing:</b> songs play in the player at the bottom of the screen and move on by themselves. On a computer, sign in at open.spotify.com in the same browser to hear full songs; otherwise Spotify plays 30-second previews. Or tap <b>Play full songs here</b> once and sign in with Spotify: from then on everything plays in full, right in this page, one song after another (needs Spotify Premium). On iPhone, keep the screen on; if it has to be locked, use <b>Play these in the Spotify app</b> instead.</p>
-    <p><b>Spotify or YouTube:</b> the switch next to the search box picks where songs play from. YouTube plays full songs for everyone, no account needed, one after another; keep the screen on while it plays. Songs YouTube doesn't have yet are greyed out and get skipped.</p>
+    <p><b>Spotify or YouTube:</b> the Spotify | YouTube switch picks where songs play from. YouTube plays full songs for everyone, no account needed, one after another; keep the screen on while it plays. Songs YouTube doesn't have yet are greyed out and get skipped.</p>
     <p><b>Spotify ↗:</b> opens a single song in the Spotify app.</p>
     <p><b>Copy as playlist:</b> copies the links for the songs on screen. On a computer, paste them into an empty playlist in the Spotify app and they all drop in.</p>
     <p><b>Tags:</b> energy, mood and genre are judgement calls, not Spotify data. Songs marked <span class="guess">~</span> were harder to place.</p>
@@ -223,16 +303,18 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
     <div class="dock-top">
       <span class="dock-now" id="dockNow"></span>
       <span class="dock-ctl">
-        <button type="button" id="prev" aria-label="Previous track">⏮ Back</button>
+        <button type="button" id="prev" aria-label="Previous track">⏮<span class="w"> Back</span></button>
         <button type="button" id="pause" aria-label="Pause or play" hidden>⏯</button>
-        <button type="button" id="next" aria-label="Next track">Skip ⏭</button>
+        <button type="button" id="next" aria-label="Next track"><span class="w">Skip </span>⏭</button>
         <button type="button" id="closeDock" aria-label="Close player">✕</button>
       </span>
     </div>
     <div id="embed"></div>
     <div class="ytbox" id="ytbox" hidden><div id="ytplayer"></div></div>
-    <button type="button" class="dock-app" id="playHere" hidden>▶ Play full songs here: sign in with Spotify</button>
-    <button type="button" class="dock-app alt" id="playApp" hidden>Or play these in the Spotify app ↗</button>
+    <div class="dock-links">
+    <button type="button" class="dock-app" id="playHere" hidden><span class="long">▶ Play full songs here: sign in with Spotify</span><span class="short">Full songs ›</span></button>
+    <button type="button" class="dock-app alt" id="playApp" hidden><span class="long">Or play these in the Spotify app ↗</span><span class="short">Spotify app ↗</span></button>
+    </div>
     <p class="app-status" id="appStatus" hidden></p>
   </div>
 </div>
@@ -281,6 +363,9 @@ function renderMoods(){
     b.onclick=()=>{S.mood=m.k;try{localStorage.setItem("bxc-mood",m.k)}catch(e){};S.mode="sample";renderMoods();renderFilters();update(true)};
     el.appendChild(b);
   });
+  const cur=MOODS.find(m=>m.k===S.mood);$("moodDesc").textContent=cur?cur.d:"";
+  const sel=el.querySelector('[aria-pressed="true"]');
+  if(sel&&el.scrollWidth>el.clientWidth)el.scrollLeft=Math.max(0,sel.offsetLeft-el.clientWidth/2+sel.offsetWidth/2);
 }
 function toggle(set,v){set.has(v)?set.delete(v):set.add(v);S.mode="sample";renderFilters();update(true)}
 function renderFilters(){
@@ -290,7 +375,18 @@ function renderFilters(){
   Object.entries(G).map(([k,l])=>[k,l,base.filter(t=>t.g.includes(k)).length]).filter(x=>x[2]>0||S.genres.has(x[0])).sort((a,b)=>b[2]-a[2])
     .forEach(([k,l,c])=>chip(g,`${l} · ${c}`,S.genres.has(k),()=>toggle(S.genres,k)));
   const d=$("decades");d.innerHTML="";DECS.forEach(x=>chip(d,x,S.decades.has(x),()=>toggle(S.decades,x)));
+  renderActive();
 }
+function renderActive(){
+  const a=$("activeChips");a.innerHTML="";
+  const on=[...[...S.energy].map(v=>[ENERGY.find(e=>e[0]===v)[1],()=>toggle(S.energy,v)]),
+    ...[...S.genres].map(k=>[G[k],()=>toggle(S.genres,k)]),...[...S.decades].map(x=>[x,()=>toggle(S.decades,x)])];
+  on.forEach(([l,fn])=>chip(a,l+" ✕",true,fn).setAttribute("aria-label","Remove "+l));
+  if(on.length>1)chip(a,"Clear all",false,()=>{S.energy.clear();S.genres.clear();S.decades.clear();S.mode="sample";renderFilters();update(true)});
+  const open=$("filtersBox").classList.contains("open");
+  $("filtersBtn").innerHTML=(open?"Hide filters":"Filters")+(on.length?`<span class="badge">${on.length}</span>`:"");
+}
+$("filtersBtn").onclick=()=>{const box=$("filtersBox");box.classList.toggle("open");$("filtersBtn").setAttribute("aria-expanded",box.classList.contains("open"));renderActive()};
 function filtered(){
   const m=MOODS.find(x=>x.k===S.mood);
   return TRACKS.filter(t=>m.f(t)&&(!S.energy.size||S.energy.has(t.e))&&(!S.genres.size||t.g.some(g=>S.genres.has(g)))&&(!S.decades.size||S.decades.has(t.dec))&&(!S.q||t.q.includes(S.q)));
@@ -304,7 +400,7 @@ function update(reshuffle){
   S.shown=S.pool.slice(0,S.limit);
   const m=MOODS.find(x=>x.k===S.mood);
   $("count").innerHTML=`${f.length} ${f.length===1?"track fits":"tracks fit"}<small>${m.n}${S.mode==="all"?" · A–Z by artist":" · showing a random "+S.shown.length}</small>`;
-  $("shuffle").textContent=S.mode==="all"?"Shuffle 12":"Shuffle again";
+  $("shuffle").textContent=S.mode==="all"?"Shuffle 12":"Shuffle again";$("mShuffle").textContent=$("shuffle").textContent;
   const ul=$("list");
   if(!f.length){ul.innerHTML=`<li class="empty">Nothing fits all of those picks. Try clearing a genre or era.</li>`}
   else ul.innerHTML=S.shown.map((t,k)=>`<li class="trk${P.q[P.i]&&P.q[P.i].id===t.id?" now":""}" data-id="${t.id}"${t.yt?"":" data-noyt"}>
@@ -377,11 +473,22 @@ function start(q,i){
   }else load(i);
 }
 $("playall").onclick=()=>{if(!S.shown.length){toast("No tracks to play");return}start(S.shown,0)};
-$("list").addEventListener("click",e=>{const b=e.target.closest("button.play");if(!b)return;start(S.shown,+b.dataset.i)});
+const PHONE=window.matchMedia("(max-width:640px)");
+$("list").addEventListener("click",e=>{
+  let b=e.target.closest("button.play");
+  if(!b&&PHONE.matches&&!e.target.closest("a")){const li=e.target.closest(".trk");if(li)b=li.querySelector("button.play")}
+  if(!b)return;start(S.shown,+b.dataset.i)});
+function closeMenu(){$("moreMenu").hidden=true;$("moreBtn").setAttribute("aria-expanded","false")}
+$("moreBtn").onclick=e=>{e.stopPropagation();const m=$("moreMenu");m.hidden=!m.hidden;$("moreBtn").setAttribute("aria-expanded",String(!m.hidden))};
+document.addEventListener("click",e=>{if(!e.target.closest("#moreMenu,#moreBtn"))closeMenu()});
+$("mShuffle").onclick=()=>{closeMenu();$("shuffle").click()};
+$("mShowall").onclick=()=>{closeMenu();$("showall").click()};
+$("mCopy").onclick=()=>{closeMenu();$("copy").click()};
 $("next").onclick=()=>{if(P.mode==="yt")ytLoad(P.i+1);else if(P.mode==="sdk")SDK.player&&SDK.player.nextTrack();else load(P.i+1)};
 $("prev").onclick=()=>{if(P.mode==="yt")ytLoad(Math.max(0,P.i-1));else if(P.mode==="sdk")SDK.player&&SDK.player.previousTrack();else load(Math.max(0,P.i-1))};
 function closeDock(){try{Y.player&&Y.ready&&Y.player.pauseVideo()}catch(e){}$("appStatus").hidden=true;try{P.ctl&&P.ctl.pause()}catch(e){};try{SDK.player&&P.mode==="sdk"&&SDK.player.pause()}catch(e){};$("dock").hidden=true;document.body.classList.remove("docked");P.q=[];mark()}
 $("closeDock").onclick=closeDock;
+function pauseLbl(paused){$("pause").innerHTML=paused?'▶<span class="w"> Play</span>':'⏸<span class="w"> Pause</span>'}
 // ---- YouTube player: full songs for everyone, no account ----
 let SRC=(()=>{try{return localStorage.getItem("bxc_src")==="yt"?"yt":"sp"}catch(e){return "sp"}})();
 const Y={api:false,player:null,ready:false,pending:null};
@@ -394,13 +501,14 @@ function loadYT(){
 function setSrc(v){
   if(v===SRC)return;
   SRC=v;try{localStorage.setItem("bxc_src",v)}catch(e){}
-  $("srcSp").setAttribute("aria-pressed",String(v==="sp"));$("srcYt").setAttribute("aria-pressed",String(v==="yt"));
+  syncSrc();
   document.body.classList.toggle("ytmode",v==="yt");
   if(v==="yt"){loadYT();const n=TRACKS.filter(t=>t.yt).length;if(n<TRACKS.length)toast(n?`${n} of ${TRACKS.length} songs are on YouTube so far`:"YouTube versions are still being found, check back soon",3500)}
   if(!$("dock").hidden)closeDock();
 }
-$("srcSp").onclick=()=>setSrc("sp");$("srcYt").onclick=()=>setSrc("yt");
-if(SRC==="yt"){$("srcSp").setAttribute("aria-pressed","false");$("srcYt").setAttribute("aria-pressed","true");document.body.classList.add("ytmode");loadYT()}
+function syncSrc(){document.querySelectorAll(".src-sp").forEach(b=>b.setAttribute("aria-pressed",String(SRC==="sp")));document.querySelectorAll(".src-yt").forEach(b=>b.setAttribute("aria-pressed",String(SRC==="yt")))}
+document.querySelectorAll(".src-sp").forEach(b=>b.onclick=()=>setSrc("sp"));document.querySelectorAll(".src-yt").forEach(b=>b.onclick=()=>setSrc("yt"));
+if(SRC==="yt"){syncSrc();document.body.classList.add("ytmode");loadYT()}
 function ytStart(q,i){
   const list=q.filter(t=>t.yt);
   if(!list.length){toast("None of these songs are on YouTube yet",3000);return}
@@ -409,7 +517,7 @@ function ytStart(q,i){
   if(!q[i].yt)toast("That one isn't on YouTube yet, so starting from the next song",3500);
   P.q=list;P.mode="yt";
   document.body.classList.add("docked");$("dock").hidden=false;$("embed").classList.add("off");$("ytbox").hidden=false;
-  $("pause").hidden=false;$("pause").textContent="⏸ Pause";$("playHere").hidden=true;$("playApp").hidden=true;appMsg("");
+  $("pause").hidden=false;pauseLbl(false);$("playHere").hidden=true;$("playApp").hidden=true;appMsg("");
   try{P.ctl&&P.ctl.pause()}catch(e){}try{SDK.player&&SDK.player.pause()}catch(e){}
   ytLoad(k);
 }
@@ -426,8 +534,8 @@ function ytLoad(k){
       onReady:e=>{Y.ready=true;const want=P.q[P.i]&&P.q[P.i].yt;if(want&&want!==vid)e.target.loadVideoById(want);else e.target.playVideo()},
       onStateChange:e=>{
         if(e.data===YT.PlayerState.ENDED)ytLoad(P.i+1);
-        else if(e.data===YT.PlayerState.PLAYING){$("pause").textContent="⏸ Pause";appMsg("")}
-        else if(e.data===YT.PlayerState.PAUSED)$("pause").textContent="▶ Play";
+        else if(e.data===YT.PlayerState.PLAYING){pauseLbl(false);appMsg("")}
+        else if(e.data===YT.PlayerState.PAUSED)pauseLbl(true);
       },
       onError:()=>{toast("That video won't play here, skipping",2500);setTimeout(()=>ytLoad(P.i+1),600)}
     }});
@@ -586,7 +694,7 @@ function makePlayer(){
     const k=P.q.findIndex(t=>t.id===id);
     if(k>=0&&k!==P.i){P.i=k;mark()}
     if(k<0)$("dockNow").textContent=`${cur.name} — ${(cur.artists||[]).map(a=>a.name).join(", ")}`;
-    $("pause").textContent=st.paused?"▶ Play":"⏸ Pause";
+    pauseLbl(st.paused);
     if(!st.paused)appMsg("");
     try{if("mediaSession" in navigator){navigator.mediaSession.metadata=new MediaMetadata({title:cur.name,artist:(cur.artists||[]).map(a=>a.name).join(", "),album:cur.album&&cur.album.name||"",artwork:(cur.album&&cur.album.images||[]).map(im=>({src:im.url,sizes:`${im.width||300}x${im.height||300}`}))});
       navigator.mediaSession.setActionHandler("nexttrack",()=>pl.nextTrack());navigator.mediaSession.setActionHandler("previoustrack",()=>pl.previousTrack());}}catch(e){}
@@ -641,7 +749,7 @@ async function playInApp(ids){
     `Spotify returned an error (${r.status}).`);
 }
 function setHereBtn(){const b=$("playHere");b.hidden=!SPOTIFY_CLIENT_ID||(sdkOn()&&P.mode==="sdk")||(SDK.failed&&signedIn());
-  b.textContent=sdkOn()?"▶ Play full songs here":"▶ Play full songs here: sign in with Spotify"}
+  b.querySelector(".long").textContent=sdkOn()?"▶ Play full songs here":"▶ Play full songs here: sign in with Spotify"}
 if(SPOTIFY_CLIENT_ID){
   $("playApp").hidden=false;$("playApp").onclick=()=>{if(P.q.length)playInApp(P.q.slice(P.i).map(t=>t.id))};
   $("playHere").onclick=()=>{if(!P.q.length)return;
@@ -661,7 +769,7 @@ async function finishSignIn(){
     // phones only allow sound after a tap, so bring the selection back and wait for one
     loadSDK();
     P.q=pending.ids.map(id=>byId.get(id)).filter(Boolean);P.i=Math.min(pending.i||0,Math.max(0,P.q.length-1));P.mode="sdk";
-    if(P.q.length){document.body.classList.add("docked");$("dock").hidden=false;$("embed").classList.add("off");$("pause").hidden=false;$("pause").textContent="▶ Play";mark();setHereBtn();
+    if(P.q.length){document.body.classList.add("docked");$("dock").hidden=false;$("embed").classList.add("off");$("pause").hidden=false;pauseLbl(true);mark();setHereBtn();
       appMsg("You're signed in. Tap ▶ Play to start the full songs.")}
     else toast("You're signed in. Pick some songs and tap Play these.",5000);
     return;
