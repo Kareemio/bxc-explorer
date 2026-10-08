@@ -97,13 +97,20 @@ footer{color:var(--muted);font-size:13px;display:flex;flex-direction:column;gap:
 #embed.off{display:none}
 [hidden]{display:none!important}
 /* Phone-only extras: invisible on desktop */
-.mood-desc,.ftools,.src-bar,.more-btn,.more-menu,.dock-app .short{display:none}
+.intro-short,.mood-pick,.mood-desc,.ftools,.src-bar,.more-btn,.more-menu,.dock-app .short{display:none}
 .filters{display:flex;flex-direction:column;gap:14px}
 .bar{position:relative}
 .dock-links{display:contents}
 @media (max-width:640px){
   .wrap{gap:16px;padding-block:16px 40px}
-  /* 1. moods: one swipeable row of pills */
+  .intro-long{display:none}
+  .intro-short{display:block}
+  /* 1. moods: a dropdown */
+  .moods{display:none!important}
+  .mood-pick{display:block;position:relative}
+  .mood-pick::after{content:"";position:absolute;right:16px;top:50%;width:9px;height:9px;border-right:2px solid var(--hot-ink);border-bottom:2px solid var(--hot-ink);transform:translateY(-70%) rotate(45deg);pointer-events:none}
+  .mood-select{-webkit-appearance:none;appearance:none;width:100%;font:400 18px/1.2 var(--display);color:var(--hot-ink);background:var(--hot);border:none;border-radius:6px 18px 6px 6px;padding:13px 44px 13px 16px;cursor:pointer}
+  .mood-select:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
   .moods{position:relative;display:flex;overflow-x:auto;gap:8px;margin-inline:-16px;padding:2px 16px 6px;scroll-snap-type:x proximity;scroll-padding-inline:16px;scrollbar-width:none}
   .moods::-webkit-scrollbar{display:none}
   .mood,.mood.wide{flex:none;flex-direction:row;align-items:baseline;gap:6px;padding:9px 14px;border-radius:999px;scroll-snap-align:start;grid-column:auto}
@@ -197,11 +204,13 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
 <div class="wrap">
   <header>
     <h1 class="brand">Bangers Xchange <span>Club</span></h1>
-    <p class="sub">Pick a mood and dip into the club's playlist. <b id="total"></b> tracks, tagged by hand for energy, mood and genre. Hit <b>Play these</b> and they play one after another right here.</p>
+    <p class="sub intro-long">Pick a mood and dip into the club's playlist. <b id="total"></b> tracks, tagged by hand for energy, mood and genre. Hit <b>Play these</b> and they play one after another right here.</p>
+    <p class="sub intro-short"><b id="totalS"></b> club picks, sorted by mood.</p>
   </header>
 
   <section aria-labelledby="moodLabel">
     <p class="label" id="moodLabel">What's the mood?</p>
+    <div class="mood-pick"><select id="moodSel" class="mood-select" aria-labelledby="moodLabel"></select></div>
     <div class="moods" id="moods"></div>
     <p class="mood-desc" id="moodDesc"></p>
   </section>
@@ -348,7 +357,7 @@ TRACKS.forEach((t,i)=>{t.n=i;t.dec=decade(t.y);t.q=(t.t+" "+t.a).toLowerCase()})
 const S={mood:"easy",energy:new Set(),genres:new Set(),decades:new Set(),q:"",shown:[],pool:[],mode:"sample",limit:12};
 try{const m=localStorage.getItem("bxc-mood");if(m&&MOODS.some(x=>x.k===m))S.mood=m}catch(e){}
 const $=id=>document.getElementById(id);
-$("total").textContent=TRACKS.length;
+$("total").textContent=TRACKS.length;$("totalS").textContent=TRACKS.length;
 $("updated").textContent=UPDATED?"Playlist last checked: "+UPDATED+". It refreshes automatically every morning.":"";
 
 function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
@@ -365,9 +374,11 @@ function renderMoods(){
     el.appendChild(b);
   });
   const cur=MOODS.find(m=>m.k===S.mood);$("moodDesc").textContent=cur?cur.d:"";
+  $("moodSel").innerHTML=MOODS.map(m=>`<option value="${m.k}"${m.k===S.mood?" selected":""}>${m.n} · ${TRACKS.filter(m.f).length}</option>`).join("");
   const sel=el.querySelector('[aria-pressed="true"]');
   if(sel&&el.scrollWidth>el.clientWidth)el.scrollLeft=Math.max(0,sel.offsetLeft-el.clientWidth/2+sel.offsetWidth/2);
 }
+$("moodSel").onchange=e=>{S.mood=e.target.value;try{localStorage.setItem("bxc-mood",S.mood)}catch(err){};S.mode="sample";renderMoods();renderFilters();update(true)};
 function toggle(set,v){set.has(v)?set.delete(v):set.add(v);S.mode="sample";renderFilters();update(true)}
 function renderFilters(){
   const e=$("energy");e.innerHTML="";ENERGY.forEach(([v,l])=>chip(e,l,S.energy.has(v),()=>toggle(S.energy,v)));
