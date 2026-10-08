@@ -10,7 +10,7 @@ on:
   workflow_dispatch:           # adds a "Run workflow" button for a manual refresh
   push:
     branches: [main]
-    paths: ["site/**", "scripts/build.py", "data/tracks.json"]
+    paths: ["site/**", "scripts/build.py", "data/tracks.json", "data/youtube_overrides.json"]
 
 permissions:
   contents: write   # save new tags back to the repo
@@ -62,6 +62,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/tag.py
+
+      - name: Find new songs on YouTube
+        if: github.event_name != 'push'
+        continue-on-error: true      # a YouTube hiccup should never stop the daily refresh
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: python scripts/youtube.py --mode official
 
       - name: Build page
         env:
