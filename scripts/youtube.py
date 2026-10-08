@@ -147,6 +147,13 @@ def main():
             print("No YOUTUBE_API_KEY set, skipping YouTube lookups.")
             return
         todo = todo[:OFFICIAL_BUDGET]
+        # cheap check (1 quota unit) so a bad or restricted key shows up in the logs straight away
+        try:
+            urllib.request.urlopen("https://www.googleapis.com/youtube/v3/videos?part=id&id=dQw4w9WgXcQ&key=" + key, timeout=20).read()
+            print("YouTube API key works.")
+        except urllib.error.HTTPError as e:
+            print(f"YouTube API key problem ({e.code}): {e.read().decode('utf-8', 'replace')[:300]}")
+            sys.exit(1)
     if args.limit:
         todo = todo[:args.limit]
     print(f"Looking up {len(todo)} tracks on YouTube ({args.mode})")
