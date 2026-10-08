@@ -81,6 +81,9 @@ footer{color:var(--muted);font-size:13px;display:flex;flex-direction:column;gap:
 .dock-now{font:500 12px/1.2 var(--mono);color:var(--muted);min-width:0}
 .dock-ctl{display:flex;gap:6px}
 .dock-ctl button{all:unset;cursor:pointer;font-weight:700;font-size:13px;padding:7px 12px;border-radius:8px;border:1.5px solid var(--ink);color:var(--ink)}
+.dock-app{all:unset;cursor:pointer;box-sizing:border-box;width:100%;text-align:center;font-weight:700;font-size:14px;padding:10px 12px;border-radius:8px;background:var(--ink);color:var(--bg)}
+.dock-app:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.app-status{font-size:13px;color:var(--muted);margin:0}
 .dock-ctl button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 #embed iframe{display:block;border-radius:12px}
 body.docked .wrap{padding-bottom:200px}
@@ -187,7 +190,7 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
 
   <details class="catch about">
     <summary>How this works</summary>
-    <p><b>Playing:</b> songs play in the player at the bottom of the screen and move on by themselves. Sign in at open.spotify.com in the same browser to hear full songs; otherwise Spotify plays 30-second previews. If a song doesn't start on its own, tap the player.</p>
+    <p><b>Playing:</b> songs play in the player at the bottom of the screen and move on by themselves. On a computer, sign in at open.spotify.com in the same browser to hear full songs; otherwise Spotify plays 30-second previews. On a phone, tap <b>Full songs in the Spotify app</b>: the songs you picked play in your Spotify app one after another, even with the screen locked (needs Spotify Premium).</p>
     <p><b>Spotify ↗:</b> opens a single song in the Spotify app.</p>
     <p><b>Copy as playlist:</b> copies the links for the songs on screen. On a computer, paste them into an empty playlist in the Spotify app and they all drop in.</p>
     <p><b>Tags:</b> energy, mood and genre are judgement calls, not Spotify data. Songs marked <span class="guess">~</span> were harder to place.</p>
@@ -206,6 +209,8 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
       </span>
     </div>
     <div id="embed"></div>
+    <button type="button" class="dock-app" id="playApp" hidden>▶ Full songs in the Spotify app</button>
+    <p class="app-status" id="appStatus" hidden></p>
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
@@ -301,7 +306,7 @@ function drawMap(f){
   TRACKS.forEach(t=>{if(!t.pending&&on.has(t.n))s+=`<circle cx="${px(t).toFixed(1)}" cy="${py(t).toFixed(1)}" r="2.4" fill="var(--hot)"/>`});
   $("map").innerHTML=s;
 }
-let toastT;function toast(m){const t=$("toast");t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2200)}
+let toastT;function toast(m){const t=$("toast");t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,arguments[1]||2200)}
 $("shuffle").onclick=()=>{S.mode="sample";S.limit=12;update(true)};
 $("showall").onclick=()=>{S.mode="all";S.limit=100000;update(true)};
 $("more").onclick=()=>{S.limit+=12;update(false)};
@@ -348,7 +353,7 @@ $("playall").onclick=()=>{if(!S.shown.length){toast("No tracks to play");return}
 $("list").addEventListener("click",e=>{const b=e.target.closest("button.play");if(!b)return;start(S.shown,+b.dataset.i)});
 $("next").onclick=()=>load(P.i+1);
 $("prev").onclick=()=>load(Math.max(0,P.i-1));
-$("closeDock").onclick=()=>{try{P.ctl&&P.ctl.pause()}catch(e){};$("dock").hidden=true;document.body.classList.remove("docked");P.q=[];mark()};
+$("closeDock").onclick=()=>{$("appStatus").hidden=true;try{P.ctl&&P.ctl.pause()}catch(e){};$("dock").hidden=true;document.body.classList.remove("docked");P.q=[];mark()};
 // ---- Missing-songs catcher: compare a WhatsApp export with the playlist ----
 const INPL=new Set(TRACKS.map(t=>t.id));
 function parseChat(text){
@@ -409,7 +414,7 @@ async function signIn(){
   const verifier=b64u(crypto.getRandomValues(new Uint8Array(48)));
   const challenge=b64u(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(verifier)));
   ss.set("sp_verifier",verifier);
-  const q=new URLSearchParams({client_id:SPOTIFY_CLIENT_ID,response_type:"code",redirect_uri:REDIRECT,code_challenge_method:"S256",code_challenge:challenge,scope:"playlist-modify-public playlist-modify-private"});
+  const q=new URLSearchParams({client_id:SPOTIFY_CLIENT_ID,response_type:"code",redirect_uri:REDIRECT,code_challenge_method:"S256",code_challenge:challenge,scope:"playlist-modify-public playlist-modify-private user-modify-playback-state user-read-playback-state"});
   location.href="https://accounts.spotify.com/authorize?"+q;
 }
 async function addToPlaylist(ids){
@@ -438,20 +443,57 @@ async function addToPlaylist(ids){
   status(`Added ${added} songs to the playlist. They'll show up in the explorer after tomorrow morning's refresh.`);
   toast(`Added ${added} songs`);
 }
-async function finishSignIn(){
-  const q=new URLSearchParams(location.search);const code=q.get("code"),err=q.get("error");
-  if(!code&&!err)return;
-  history.replaceState(null,"",REDIRECT+"#missing");$("catch").open=true;
-  const pending=JSON.parse(ss.get("sp_pending")||"[]");ss.del("sp_pending");
-  const out=$("catchOut");
-  if(err){out.innerHTML=`<p class="sub">Spotify sign-in was cancelled.</p>`;return}
+async function swapCode(code,fail){
   try{
     const r=await fetch("https://accounts.spotify.com/api/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
       body:new URLSearchParams({client_id:SPOTIFY_CLIENT_ID,grant_type:"authorization_code",code,redirect_uri:REDIRECT,code_verifier:ss.get("sp_verifier")||""})});
     const j=await r.json();ss.del("sp_verifier");
     if(!r.ok)throw new Error(j.error_description||j.error||r.status);
-    ss.set("sp_token",j.access_token);ss.set("sp_exp",String(Date.now()+(j.expires_in-60)*1000));
-  }catch(e){out.innerHTML=`<p class="sub">Spotify sign-in failed (${esc(String(e.message||e))}). If this keeps happening, the account may not be on the Spotify app's user list.</p>`;return}
+    ss.set("sp_token",j.access_token);ss.set("sp_exp",String(Date.now()+(j.expires_in-60)*1000));ss.set("sp_scope",j.scope||"");return true;
+  }catch(e){fail(String(e.message||e));return false}
+}
+// ---- Hand the queue to the person's Spotify app (full songs, keeps going on a locked phone) ----
+function appMsg(m){const el=$("appStatus");if(!$("dock").hidden){el.hidden=false;el.textContent=m}else toast(m,6000)}
+async function playInApp(ids){
+  const tok=ss.get("sp_token"),exp=+ss.get("sp_exp")||0;
+  const needsLogin=!tok||Date.now()>exp||!(ss.get("sp_scope")||"").includes("user-modify-playback-state");
+  if(needsLogin){ss.set("sp_pending",JSON.stringify({kind:"play",ids}));appMsg("Opening Spotify sign-in…");return signIn()}
+  const H={Authorization:"Bearer "+tok};
+  appMsg("Sending to Spotify…");
+  let dev=null;
+  try{const r=await fetch("https://api.spotify.com/v1/me/player/devices",{headers:H});
+    if(r.status===401){ss.del("sp_token");return playInApp(ids)}
+    const ds=(await r.json()).devices||[];
+    dev=ds.find(d=>d.is_active)||ds.find(d=>d.type==="Smartphone")||ds[0]||null;
+  }catch(e){}
+  if(!dev){appMsg("Spotify can't see your app yet. Open the Spotify app, play any song for a second, then come back and tap the button again.");return}
+  const uris=ids.slice(0,100).map(id=>"spotify:track:"+id);
+  const r=await fetch("https://api.spotify.com/v1/me/player/play?device_id="+encodeURIComponent(dev.id),{method:"PUT",headers:{...H,"Content-Type":"application/json"},body:JSON.stringify({uris})});
+  if(r.ok){
+    try{P.ctl&&P.ctl.pause()}catch(e){}
+    appMsg(`Playing ${uris.length} songs on ${dev.name}. They'll keep going with the screen locked.${ids.length>100?" (Spotify takes the first 100 at a time.)":""}`);return;
+  }
+  let reason="";try{reason=(await r.json()).error.reason||""}catch(e){}
+  if(r.status===401){ss.del("sp_token");return playInApp(ids)}
+  appMsg(reason==="PREMIUM_REQUIRED"||r.status===403?"Spotify only lets this work with a Premium account (or an account that's on the app's user list).":
+    r.status===404?"Spotify can't reach your app. Open the Spotify app, play any song for a second, then tap the button again.":
+    `Spotify returned an error (${r.status}).`);
+}
+if(SPOTIFY_CLIENT_ID){$("playApp").hidden=false;$("playApp").onclick=()=>{if(P.q.length)playInApp(P.q.slice(P.i).map(t=>t.id))}}
+async function finishSignIn(){
+  const q=new URLSearchParams(location.search);const code=q.get("code"),err=q.get("error");
+  if(!code&&!err)return;
+  let pending=[];try{pending=JSON.parse(ss.get("sp_pending")||"[]")}catch(e){}ss.del("sp_pending");
+  if(pending&&pending.kind==="play"){
+    history.replaceState(null,"",REDIRECT);
+    if(err){appMsg("Spotify sign-in was cancelled.");return}
+    if(await swapCode(code,m=>appMsg("Spotify sign-in failed ("+m+")."))) await playInApp(pending.ids);
+    return;
+  }
+  history.replaceState(null,"",REDIRECT+"#missing");$("catch").open=true;
+  const out=$("catchOut");
+  if(err){out.innerHTML=`<p class="sub">Spotify sign-in was cancelled.</p>`;return}
+  if(!await swapCode(code,m=>{out.innerHTML=`<p class="sub">Spotify sign-in failed (${esc(m)}). If this keeps happening, the account may not be on the Spotify app's user list.</p>`}))return;
   if(pending.length){out.innerHTML=`<p class="sub" id="addStatus"></p>`;await addToPlaylist(pending)}
 }
 if(SPOTIFY_CLIENT_ID)finishSignIn();
