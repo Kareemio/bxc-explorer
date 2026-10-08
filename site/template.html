@@ -126,8 +126,13 @@ footer{color:var(--muted);font-size:13px;display:flex;flex-direction:column;gap:
   .ftools{order:2;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
   .filters{order:3;display:none;background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:14px}
   .filters.open{display:flex}
-  #filtersBtn{padding:8px 14px;font-size:14px}
-  #filtersBtn .badge{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:6px;border-radius:999px;background:var(--hot);color:var(--hot-ink);font-size:12px}
+  #filtersBtn{box-sizing:border-box;width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;font-size:15px;font-weight:500;background:var(--card)}
+  #filtersBtn b{font-weight:700}
+  #filtersBtn .fl-sub{color:var(--muted)}
+  #filtersBtn .fl-end{display:flex;align-items:center;gap:10px;flex:none}
+  #filtersBtn .fl-chev{font-size:13px}
+  #filtersBtn[aria-expanded="true"]{border-color:var(--ink)}
+  #filtersBtn .badge{display:inline-grid;place-items:center;height:22px;padding:0 8px;border-radius:999px;background:var(--hot);color:var(--hot-ink);font-size:12px;font-weight:700}
   #activeChips{display:contents}
   #activeChips .chip{background:var(--ink);color:var(--bg);border-color:var(--ink)}
   /* 5. search full width; switch moves to the results bar */
@@ -396,7 +401,7 @@ function renderActive(){
   on.forEach(([l,fn])=>chip(a,l+" ✕",true,fn).setAttribute("aria-label","Remove "+l));
   if(on.length>1)chip(a,"Clear all",false,()=>{S.energy.clear();S.genres.clear();S.decades.clear();S.mode="sample";renderFilters();update(true)});
   const open=$("filtersBox").classList.contains("open");
-  $("filtersBtn").innerHTML=(open?"Hide filters":"Filters")+(on.length?`<span class="badge">${on.length}</span>`:"");
+  $("filtersBtn").innerHTML=`<span><b>Filters:</b> <span class="fl-sub">Energy, Genre, Era</span></span><span class="fl-end">${on.length?`<span class="badge">${on.length} on</span>`:""}<span class="fl-chev">${open?"▴":"▾"}</span></span>`;
 }
 $("filtersBtn").onclick=()=>{const box=$("filtersBox");box.classList.toggle("open");$("filtersBtn").setAttribute("aria-expanded",box.classList.contains("open"));renderActive()};
 function filtered(){
