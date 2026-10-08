@@ -82,6 +82,9 @@ footer{color:var(--muted);font-size:13px;display:flex;flex-direction:column;gap:
 .dock-ctl{display:flex;gap:6px}
 .dock-ctl button{all:unset;cursor:pointer;font-weight:700;font-size:13px;padding:7px 12px;border-radius:8px;border:1.5px solid var(--ink);color:var(--ink)}
 .dock-app{all:unset;cursor:pointer;box-sizing:border-box;width:100%;text-align:center;font-weight:700;font-size:14px;padding:10px 12px;border-radius:8px;background:var(--ink);color:var(--bg)}
+.dock-app.alt{background:none;color:var(--ink);border:1.5px solid var(--ink);font-size:13px;padding:8px 12px}
+#embed.off{display:none}
+[hidden]{display:none!important}
 .dock-app:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 .app-status{font-size:13px;color:var(--muted);margin:0}
 .dock-ctl button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
@@ -190,7 +193,7 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
 
   <details class="catch about">
     <summary>How this works</summary>
-    <p><b>Playing:</b> songs play in the player at the bottom of the screen and move on by themselves. On a computer, sign in at open.spotify.com in the same browser to hear full songs; otherwise Spotify plays 30-second previews. On a phone, tap <b>Full songs in the Spotify app</b>: the songs you picked play in your Spotify app one after another, even with the screen locked (needs Spotify Premium).</p>
+    <p><b>Playing:</b> songs play in the player at the bottom of the screen and move on by themselves. On a computer, sign in at open.spotify.com in the same browser to hear full songs; otherwise Spotify plays 30-second previews. Or tap <b>Play full songs here</b> once and sign in with Spotify: from then on everything plays in full, right in this page, one song after another (needs Spotify Premium). On iPhone, keep the screen on; if it has to be locked, use <b>Play these in the Spotify app</b> instead.</p>
     <p><b>Spotify ↗:</b> opens a single song in the Spotify app.</p>
     <p><b>Copy as playlist:</b> copies the links for the songs on screen. On a computer, paste them into an empty playlist in the Spotify app and they all drop in.</p>
     <p><b>Tags:</b> energy, mood and genre are judgement calls, not Spotify data. Songs marked <span class="guess">~</span> were harder to place.</p>
@@ -204,12 +207,14 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
       <span class="dock-now" id="dockNow"></span>
       <span class="dock-ctl">
         <button type="button" id="prev" aria-label="Previous track">⏮ Back</button>
+        <button type="button" id="pause" aria-label="Pause or play" hidden>⏯</button>
         <button type="button" id="next" aria-label="Next track">Skip ⏭</button>
         <button type="button" id="closeDock" aria-label="Close player">✕</button>
       </span>
     </div>
     <div id="embed"></div>
-    <button type="button" class="dock-app" id="playApp" hidden>▶ Full songs in the Spotify app</button>
+    <button type="button" class="dock-app" id="playHere" hidden>▶ Play full songs here: sign in with Spotify</button>
+    <button type="button" class="dock-app alt" id="playApp" hidden>Or play these in the Spotify app ↗</button>
     <p class="app-status" id="appStatus" hidden></p>
   </div>
 </div>
@@ -330,6 +335,8 @@ function load(i){
 }
 function start(q,i){
   if(!q.length)return;
+  if(sdkOn()){sdkStart(q,i);return}
+  P.mode="embed";$("embed").classList.remove("off");$("pause").hidden=true;setHereBtn();
   P.q=q.slice();document.body.classList.add("docked");$("dock").hidden=false;
   if(!P.api){P.pendingStart={q,i};$("dockNow").textContent="Loading Spotify player…";return}
   if(!P.ctl){
@@ -351,9 +358,9 @@ function start(q,i){
 }
 $("playall").onclick=()=>{if(!S.shown.length){toast("No tracks to play");return}start(S.shown,0)};
 $("list").addEventListener("click",e=>{const b=e.target.closest("button.play");if(!b)return;start(S.shown,+b.dataset.i)});
-$("next").onclick=()=>load(P.i+1);
-$("prev").onclick=()=>load(Math.max(0,P.i-1));
-$("closeDock").onclick=()=>{$("appStatus").hidden=true;try{P.ctl&&P.ctl.pause()}catch(e){};$("dock").hidden=true;document.body.classList.remove("docked");P.q=[];mark()};
+$("next").onclick=()=>{if(P.mode==="sdk")SDK.player&&SDK.player.nextTrack();else load(P.i+1)};
+$("prev").onclick=()=>{if(P.mode==="sdk")SDK.player&&SDK.player.previousTrack();else load(Math.max(0,P.i-1))};
+$("closeDock").onclick=()=>{$("appStatus").hidden=true;try{P.ctl&&P.ctl.pause()}catch(e){};try{SDK.player&&P.mode==="sdk"&&SDK.player.pause()}catch(e){};$("dock").hidden=true;document.body.classList.remove("docked");P.q=[];mark()};
 // ---- Missing-songs catcher: compare a WhatsApp export with the playlist ----
 const INPL=new Set(TRACKS.map(t=>t.id));
 function parseChat(text){
@@ -408,18 +415,42 @@ const SPOTIFY_CLIENT_ID="__SPOTIFY_CLIENT_ID__".startsWith("__")?"":"__SPOTIFY_C
 const PLAYLIST_ID="__PLAYLIST_ID__";
 const REDIRECT=location.origin+location.pathname;
 const ss={get:k=>{try{return sessionStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{sessionStorage.setItem(k,v)}catch(e){}},del:k=>{try{sessionStorage.removeItem(k)}catch(e){}}};
+// sign-in is kept on this device so people don't have to log in every visit
+const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return ss.get(k)}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){ss.set(k,v)}},del:k=>{try{localStorage.removeItem(k)}catch(e){}ss.del(k)}};
+const SCOPES="playlist-modify-public playlist-modify-private user-modify-playback-state user-read-playback-state streaming user-read-email user-read-private";
 const b64u=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 function status(msg){const el=$("addStatus");if(el){el.hidden=false;el.textContent=msg}else toast(msg)}
 async function signIn(){
   const verifier=b64u(crypto.getRandomValues(new Uint8Array(48)));
   const challenge=b64u(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(verifier)));
   ss.set("sp_verifier",verifier);
-  const q=new URLSearchParams({client_id:SPOTIFY_CLIENT_ID,response_type:"code",redirect_uri:REDIRECT,code_challenge_method:"S256",code_challenge:challenge,scope:"playlist-modify-public playlist-modify-private user-modify-playback-state user-read-playback-state"});
+  const q=new URLSearchParams({client_id:SPOTIFY_CLIENT_ID,response_type:"code",redirect_uri:REDIRECT,code_challenge_method:"S256",code_challenge:challenge,scope:SCOPES});
   location.href="https://accounts.spotify.com/authorize?"+q;
 }
+function saveTok(j){
+  ls.set("sp_token",j.access_token);ls.set("sp_exp",String(Date.now()+(j.expires_in-60)*1000));
+  if(j.refresh_token)ls.set("sp_refresh",j.refresh_token);if(j.scope)ls.set("sp_scope",j.scope);
+}
+function signOut(){["sp_token","sp_exp","sp_refresh","sp_scope"].forEach(ls.del)}
+const hasScope=x=>(ls.get("sp_scope")||"").split(" ").includes(x);
+const signedIn=()=>!!(ls.get("sp_refresh")||ls.get("sp_token"));
+let refreshing=null;
+async function getToken(){
+  const tok=ls.get("sp_token"),exp=+ls.get("sp_exp")||0;
+  if(tok&&Date.now()<exp)return tok;
+  const rt=ls.get("sp_refresh");if(!rt)return null;
+  if(!refreshing)refreshing=(async()=>{
+    try{const r=await fetch("https://accounts.spotify.com/api/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
+        body:new URLSearchParams({client_id:SPOTIFY_CLIENT_ID,grant_type:"refresh_token",refresh_token:rt})});
+      const j=await r.json();if(!r.ok){if(r.status===400)signOut();return null}
+      saveTok(j);return j.access_token;
+    }catch(e){return null}finally{refreshing=null}
+  })();
+  return refreshing;
+}
 async function addToPlaylist(ids){
-  const tok=ss.get("sp_token"),exp=+ss.get("sp_exp")||0;
-  if(!tok||Date.now()>exp){ss.set("sp_pending",JSON.stringify(ids));status("Opening Spotify sign-in…");return signIn()}
+  const tok=await getToken();
+  if(!tok||!hasScope("playlist-modify-public")){ss.set("sp_pending",JSON.stringify(ids));status("Opening Spotify sign-in…");return signIn()}
   status(`Adding ${ids.length} songs…`);
   let added=0;
   for(let i=0;i<ids.length;i+=100){
@@ -434,7 +465,7 @@ async function addToPlaylist(ids){
       const why=r.status===401?"The Spotify sign-in expired. Tap the button again.":
         r.status===403?"Spotify refused. This only works for the playlist's owner or a collaborator who's on the app's user list.":
         `Spotify returned an error (${r.status}).`;
-      if(r.status===401){ss.del("sp_token")}
+      if(r.status===401){ls.del("sp_token")}
       status(`${added?`Added ${added}, then stopped. `:""}${why}${detail?" ("+detail+")":""} You can still use Copy all missing links.`);return;
     }
     added+=uris.length;
@@ -449,21 +480,79 @@ async function swapCode(code,fail){
       body:new URLSearchParams({client_id:SPOTIFY_CLIENT_ID,grant_type:"authorization_code",code,redirect_uri:REDIRECT,code_verifier:ss.get("sp_verifier")||""})});
     const j=await r.json();ss.del("sp_verifier");
     if(!r.ok)throw new Error(j.error_description||j.error||r.status);
-    ss.set("sp_token",j.access_token);ss.set("sp_exp",String(Date.now()+(j.expires_in-60)*1000));ss.set("sp_scope",j.scope||"");return true;
+    saveTok(j);return true;
   }catch(e){fail(String(e.message||e));return false}
 }
-// ---- Hand the queue to the person's Spotify app (full songs, keeps going on a locked phone) ----
-function appMsg(m){const el=$("appStatus");if(!$("dock").hidden){el.hidden=false;el.textContent=m}else toast(m,6000)}
+function appMsg(m){const el=$("appStatus");if(!$("dock").hidden){el.hidden=!m;el.textContent=m||""}else if(m)toast(m,6000)}
+const byId=new Map(TRACKS.map(t=>[t.id,t]));
+function pendingQueue(){return {ids:P.q.map(t=>t.id),i:P.i}}
+
+// ---- Full songs right here in the page (Spotify Web Playback SDK, Premium) ----
+const SDK={player:null,deviceId:null,failed:false,waiters:[]};
+const sdkOn=()=>!!SPOTIFY_CLIENT_ID&&signedIn()&&hasScope("streaming")&&!SDK.failed;
+function loadSDK(){
+  if(window.Spotify||document.getElementById("sdkjs"))return;
+  window.onSpotifyWebPlaybackSDKReady=makePlayer;
+  const sc=document.createElement("script");sc.id="sdkjs";sc.src="https://sdk.scdn.co/spotify-player.js";document.head.appendChild(sc);
+}
+function sdkFail(m){SDK.failed=true;SDK.deviceId=null;SDK.waiters.splice(0).forEach(f=>f(null));appMsg(m);setHereBtn()}
+function makePlayer(){
+  if(SDK.player)return;
+  const pl=new Spotify.Player({name:"BXC Explorer",volume:1,getOAuthToken:cb=>getToken().then(t=>{if(t)cb(t);else sdkFail("Your Spotify sign-in ran out. Tap the button below to sign in again.")})});
+  SDK.player=pl;
+  pl.addListener("ready",({device_id})=>{SDK.deviceId=device_id;SDK.waiters.splice(0).forEach(f=>f(device_id))});
+  pl.addListener("not_ready",()=>{SDK.deviceId=null});
+  pl.addListener("account_error",()=>sdkFail("Playing full songs in the page needs Spotify Premium, so this falls back to 30-second previews."));
+  pl.addListener("initialization_error",()=>sdkFail("This browser can't play full songs in the page. Try Chrome or Safari, or use the Spotify app button."));
+  pl.addListener("authentication_error",()=>{signOut();sdkFail("Spotify needs you to sign in again. Tap the button below.")});
+  pl.addListener("playback_error",e=>appMsg("Spotify couldn't play that song ("+(e&&e.message||"error")+"). Tap Skip."));
+  pl.addListener("autoplay_failed",()=>appMsg("Your phone blocked autoplay. Tap ⏯ to start."));
+  pl.addListener("player_state_changed",st=>{
+    if(!st||P.mode!=="sdk")return;
+    const cur=st.track_window&&st.track_window.current_track;if(!cur)return;
+    const id=(cur.linked_from&&cur.linked_from.id)||cur.id;
+    const k=P.q.findIndex(t=>t.id===id);
+    if(k>=0&&k!==P.i){P.i=k;mark()}
+    if(k<0)$("dockNow").textContent=`${cur.name} — ${(cur.artists||[]).map(a=>a.name).join(", ")}`;
+    $("pause").textContent=st.paused?"▶ Play":"⏸ Pause";
+    if(!st.paused)appMsg("");
+    try{if("mediaSession" in navigator){navigator.mediaSession.metadata=new MediaMetadata({title:cur.name,artist:(cur.artists||[]).map(a=>a.name).join(", "),album:cur.album&&cur.album.name||"",artwork:(cur.album&&cur.album.images||[]).map(im=>({src:im.url,sizes:`${im.width||300}x${im.height||300}`}))});
+      navigator.mediaSession.setActionHandler("nexttrack",()=>pl.nextTrack());navigator.mediaSession.setActionHandler("previoustrack",()=>pl.previousTrack());}}catch(e){}
+  });
+  pl.connect().then(ok=>{if(!ok)sdkFail("Couldn't start the Spotify player in this page. Use the Spotify app button instead.")});
+}
+const deviceReady=()=>SDK.deviceId?Promise.resolve(SDK.deviceId):new Promise(res=>{SDK.waiters.push(res);setTimeout(()=>res(SDK.deviceId),12000)});
+function sdkStart(q,i){
+  P.q=q.slice();P.i=i;P.mode="sdk";mark();
+  document.body.classList.add("docked");$("dock").hidden=false;$("embed").classList.add("off");$("pause").hidden=false;setHereBtn();
+  try{P.ctl&&P.ctl.pause()}catch(e){}
+  if(!SDK.player){loadSDK();appMsg("Starting the Spotify player… tap ⏯ if nothing plays in a few seconds.")}
+  else SDK.player.activateElement();          // must happen inside the tap, or phones block the sound
+  (async()=>{
+    const dev=await deviceReady();
+    if(!dev){if(!SDK.failed)appMsg("The Spotify player didn't start. Tap ⏯ to try again.");if(SDK.failed)start(q,i);return}
+    const tok=await getToken();if(!tok){sdkFail("Your Spotify sign-in ran out. Tap the button below to sign in again.");return}
+    const base=i<100?0:i;P.base=base;
+    const uris=q.slice(base,base+100).map(t=>"spotify:track:"+t.id);
+    const r=await fetch("https://api.spotify.com/v1/me/player/play?device_id="+encodeURIComponent(dev),{method:"PUT",headers:{Authorization:"Bearer "+tok,"Content-Type":"application/json"},body:JSON.stringify({uris,offset:{position:i-base}})});
+    if(!r.ok){let reason="";try{reason=(await r.json()).error.reason||""}catch(e){}
+      if(reason==="PREMIUM_REQUIRED"||r.status===403){sdkFail("Playing full songs needs Spotify Premium, so here are the 30-second previews.");start(q,i);return}
+      appMsg(`Spotify returned an error (${r.status}). Tap ⏯ or try again.`);return}
+    if(q.length-base>100)appMsg("Playing the next 100 songs. Tap ▶ on a later song to carry on past that.");
+  })();
+}
+$("pause").onclick=()=>{if(!SDK.player)return;SDK.player.activateElement();if(P.mode!=="sdk")return;if(!SDK.deviceId){sdkStart(P.q,P.i);return}
+  SDK.player.getCurrentState().then(st=>{if(st)SDK.player.togglePlay();else sdkStart(P.q,P.i)})};
+
+// ---- Hand the queue to the person's Spotify app instead (keeps going on a locked phone) ----
 async function playInApp(ids){
-  const tok=ss.get("sp_token"),exp=+ss.get("sp_exp")||0;
-  const needsLogin=!tok||Date.now()>exp||!(ss.get("sp_scope")||"").includes("user-modify-playback-state");
-  if(needsLogin){ss.set("sp_pending",JSON.stringify({kind:"play",ids}));appMsg("Opening Spotify sign-in…");return signIn()}
+  const tok=await getToken();
+  if(!tok||!hasScope("user-modify-playback-state")){ss.set("sp_pending",JSON.stringify({kind:"app",ids}));appMsg("Opening Spotify sign-in…");return signIn()}
   const H={Authorization:"Bearer "+tok};
   appMsg("Sending to Spotify…");
   let dev=null;
   try{const r=await fetch("https://api.spotify.com/v1/me/player/devices",{headers:H});
-    if(r.status===401){ss.del("sp_token");return playInApp(ids)}
-    const ds=(await r.json()).devices||[];
+    const ds=((await r.json()).devices||[]).filter(d=>d.id!==SDK.deviceId);
     dev=ds.find(d=>d.is_active)||ds.find(d=>d.type==="Smartphone")||ds[0]||null;
   }catch(e){}
   if(!dev){appMsg("Spotify can't see your app yet. Open the Spotify app, play any song for a second, then come back and tap the button again.");return}
@@ -471,23 +560,37 @@ async function playInApp(ids){
   const r=await fetch("https://api.spotify.com/v1/me/player/play?device_id="+encodeURIComponent(dev.id),{method:"PUT",headers:{...H,"Content-Type":"application/json"},body:JSON.stringify({uris})});
   if(r.ok){
     try{P.ctl&&P.ctl.pause()}catch(e){}
-    appMsg(`Playing ${uris.length} songs on ${dev.name}. They'll keep going with the screen locked.${ids.length>100?" (Spotify takes the first 100 at a time.)":""}`);return;
+    appMsg(`Playing ${uris.length} songs on ${dev.name}. They'll keep going with the screen locked.`);return;
   }
   let reason="";try{reason=(await r.json()).error.reason||""}catch(e){}
-  if(r.status===401){ss.del("sp_token");return playInApp(ids)}
   appMsg(reason==="PREMIUM_REQUIRED"||r.status===403?"Spotify only lets this work with a Premium account (or an account that's on the app's user list).":
     r.status===404?"Spotify can't reach your app. Open the Spotify app, play any song for a second, then tap the button again.":
     `Spotify returned an error (${r.status}).`);
 }
-if(SPOTIFY_CLIENT_ID){$("playApp").hidden=false;$("playApp").onclick=()=>{if(P.q.length)playInApp(P.q.slice(P.i).map(t=>t.id))}}
+function setHereBtn(){const b=$("playHere");b.hidden=!SPOTIFY_CLIENT_ID||(sdkOn()&&P.mode==="sdk")||(SDK.failed&&signedIn());
+  b.textContent=sdkOn()?"▶ Play full songs here":"▶ Play full songs here: sign in with Spotify"}
+if(SPOTIFY_CLIENT_ID){
+  $("playApp").hidden=false;$("playApp").onclick=()=>{if(P.q.length)playInApp(P.q.slice(P.i).map(t=>t.id))};
+  $("playHere").onclick=()=>{if(!P.q.length)return;
+    if(sdkOn()){sdkStart(P.q,P.i);return}
+    ss.set("sp_pending",JSON.stringify({kind:"here",...pendingQueue()}));appMsg("Opening Spotify sign-in…");signIn()};
+  if(sdkOn())loadSDK();
+}
 async function finishSignIn(){
   const q=new URLSearchParams(location.search);const code=q.get("code"),err=q.get("error");
   if(!code&&!err)return;
   let pending=[];try{pending=JSON.parse(ss.get("sp_pending")||"[]")}catch(e){}ss.del("sp_pending");
-  if(pending&&pending.kind==="play"){
+  if(pending&&(pending.kind==="app"||pending.kind==="here")){
     history.replaceState(null,"",REDIRECT);
     if(err){appMsg("Spotify sign-in was cancelled.");return}
-    if(await swapCode(code,m=>appMsg("Spotify sign-in failed ("+m+")."))) await playInApp(pending.ids);
+    if(!await swapCode(code,m=>appMsg("Spotify sign-in failed ("+m+")."))) return;
+    if(pending.kind==="app"){await playInApp(pending.ids);return}
+    // phones only allow sound after a tap, so bring the selection back and wait for one
+    loadSDK();
+    P.q=pending.ids.map(id=>byId.get(id)).filter(Boolean);P.i=Math.min(pending.i||0,Math.max(0,P.q.length-1));P.mode="sdk";
+    if(P.q.length){document.body.classList.add("docked");$("dock").hidden=false;$("embed").classList.add("off");$("pause").hidden=false;$("pause").textContent="▶ Play";mark();setHereBtn();
+      appMsg("You're signed in. Tap ▶ Play to start the full songs.")}
+    else toast("You're signed in. Pick some songs and tap Play these.",5000);
     return;
   }
   history.replaceState(null,"",REDIRECT+"#missing");$("catch").open=true;
