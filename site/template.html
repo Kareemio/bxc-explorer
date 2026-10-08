@@ -288,13 +288,13 @@ textarea.fallback{width:100%;min-height:120px;font:12px var(--mono);background:v
   <section class="bottom">
   <details class="catch" id="catch">
     <summary>For Yan Ni: find missing songs and bulk add them to the playlist</summary>
-    <p class="hint">Checks the WhatsApp chat for shared songs that aren't in the playlist yet, then adds them all in one tap.</p>
+    <p class="hint" id="catchHint">Checks the WhatsApp chat for shared songs that aren't in the playlist yet, then adds them all in one tap.</p>
     <div class="catch-body">
       <ol class="steps">
         <li>In WhatsApp, open the group, tap its name, then <b>Export chat → Without media</b>.</li>
         <li>Choose <b>Save to Files</b> (iPhone) or save it to your phone (Android).</li>
         <li>Tap the box below and pick the export.</li>
-        <li>Tap <b>Add all to the playlist</b>.</li>
+        <li id="catchLast">Tap <b>Add all to the playlist</b>.</li>
       </ol>
       <label class="drop" id="drop" for="chatfile">Tap to choose the chat export<input type="file" id="chatfile" accept=".txt,.zip,text/plain,application/zip"></label>
       <p class="hint" style="margin:0">The chat is read on this phone only and never uploaded.</p>
@@ -798,6 +798,8 @@ async function finishSignIn(){
   if(pending.length){out.innerHTML=`<p class="sub" id="addStatus"></p>`;await addToPlaylist(pending)}
 }
 if(SPOTIFY_CLIENT_ID)finishSignIn();
+else{$("catchHint").textContent="Checks the WhatsApp chat for shared songs that aren't in the playlist yet, and copies their links so you can add them all at once.";
+  $("catchLast").innerHTML="Tap <b>Copy all missing links</b>, then on a computer open the playlist in the Spotify app, click in the track list and paste. They all drop in.";}
 $("chatfile").onchange=e=>{const f=e.target.files[0];if(f)runCatch(f)};
 const dz=$("drop");["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("over")}));
 ["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("over")}));
